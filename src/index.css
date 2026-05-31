@@ -2,11 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Global font ───────────────────────────────────────── */
 * {
   font-family: 'Rubik', system-ui, sans-serif;
 }
 
+/* ── Body: RTL + football dot-grid background ──────────── */
 body {
   direction: rtl;
-  background-color: #f9fafb;
+  min-height: 100vh;
+  background-color: #f0fdf4;
+  /* Subtle football-pitch dot grid */
+  background-image: radial-gradient(
+    circle at 1.5px 1.5px,
+    rgba(16, 185, 129, 0.08) 1.5px,
+    transparent 0
+  );
+  background-size: 28px 28px;
 }
+
+/* ── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar          { width: 5px; height: 5px; }
+::-webkit-scrollbar-track    { background: transparent; }
+::-webkit-scrollbar-thumb    { background: rgba(16,185,129,0.28); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(16,185,129,0.5); }
+
+/* Hide scrollbar for filter pill rows */
+.scrollbar-none                        { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar     { display: none; }
+
+/* ── Text selection ────────────────────────────────────── */
+::selection { background: rgba(16, 185, 129, 0.18); }
+
+/* ── Match card hover lift ─────────────────────────────── */
+.match-card {
+  transition: transform 0.22s cubic-bezier(.34,1.56,.64,1),
+              box-shadow 0.22s ease;
+}
+.match-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px -4px rgba(0,0,0,0.12), 0 4px 8px -2px rgba(0,0,0,0.06);
+}
+
+/* ── Bet button pulse on select ────────────────────────── */
+@keyframes bet-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.bet-pop { animation: bet-pop 0.22s ease forwards; }
+
+/* ── Live badge pulse ──────────────────────────────────── */
+@keyframes live-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.live-dot { animation: live-dot 1.2s ease-in-out infinite; }
