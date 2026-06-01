@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useAdmin } from '../../context/AdminContext'
 
 const NAV = [
   { to: '/',           label: 'בית',     icon: '🏠' },
@@ -10,7 +11,8 @@ const NAV = [
 
 export default function Header() {
   const { user, profile, signOut } = useAuth()
-  const { pathname } = useLocation()
+  const { isAdmin }                = useAdmin()
+  const { pathname }               = useLocation()
 
   return (
     <header className="sticky top-0 z-50">
@@ -44,6 +46,19 @@ export default function Header() {
             <div className="flex items-center gap-2">
               {user ? (
                 <>
+                  {/* Admin badge */}
+                  {isAdmin && (
+                    <Link
+                      to="/admin"
+                      className={`hidden sm:flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-lg transition-colors border ${
+                        pathname === '/admin'
+                          ? 'bg-amber-400 text-amber-900 border-amber-300'
+                          : 'bg-white/10 hover:bg-white/20 text-amber-300 border-white/10'
+                      }`}
+                    >
+                      🔐 ניהול
+                    </Link>
+                  )}
                   {profile?.total_points != null && (
                     <div className="hidden sm:flex items-center gap-1 bg-white/10 backdrop-blur-sm border border-white/10 px-2.5 py-1 rounded-lg">
                       <span className="text-sm">⭐</span>
@@ -92,6 +107,20 @@ export default function Header() {
                 </Link>
               )
             })}
+            {/* Admin tab (mobile — only visible for admins) */}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`sm:hidden flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold border-b-2 transition-all duration-200 ${
+                  pathname === '/admin'
+                    ? 'text-amber-300 border-amber-400'
+                    : 'text-green-300/60 border-transparent hover:text-amber-300'
+                }`}
+              >
+                <span>🔐</span>
+                <span>ניהול</span>
+              </Link>
+            )}
           </nav>
         </div>
       </div>
