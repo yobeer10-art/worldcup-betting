@@ -6,11 +6,13 @@ import Header from '../components/Layout/Header'
 import AdminDashboard    from '../components/Admin/AdminDashboard'
 import AdminMatchManager from '../components/Admin/AdminMatchManager'
 import AdminUserManager  from '../components/Admin/AdminUserManager'
+import AdminBracketManager from '../components/Admin/AdminBracketManager'
 import Spinner from '../components/UI/Spinner'
 
 const TABS = [
   { id: 'dashboard', label: 'סטטיסטיקות', icon: '📊' },
   { id: 'matches',   label: 'משחקים',      icon: '⚽' },
+  { id: 'bracket',   label: 'מדרגי',       icon: '🎯' },
   { id: 'users',     label: 'משתמשים',     icon: '👥' },
 ]
 
@@ -36,9 +38,9 @@ function AccessDenied() {
 }
 
 export default function AdminPage() {
-  const { user }              = useAuth()
+  const { user }               = useAuth()
   const { isAdmin, adminLoading } = useAdmin()
-  const [tab, setTab]         = useState('dashboard')
+  const [tab, setTab]          = useState('dashboard')
 
   if (adminLoading) {
     return (
@@ -62,10 +64,9 @@ export default function AdminPage() {
     <>
       <Header />
 
-      {/* ── Admin sub-header ───────────────────────────────────── */}
+      {/* Admin sub-header */}
       <div className="bg-slate-800 shadow-lg">
         <div className="max-w-5xl mx-auto px-4">
-          {/* Title row */}
           <div className="flex items-center gap-3 py-3 border-b border-slate-700">
             <span className="text-xl">🔐</span>
             <div>
@@ -77,13 +78,12 @@ export default function AdminPage() {
             </span>
           </div>
 
-          {/* Tab nav */}
-          <nav className="flex">
+          <nav className="flex overflow-x-auto scrollbar-none">
             {TABS.map(({ id, label, icon }) => (
               <button
                 key={id}
                 onClick={() => setTab(id)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold border-b-2 transition-all duration-200 ${
+                className={`shrink-0 flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-all duration-200 ${
                   tab === id
                     ? 'text-white border-emerald-400'
                     : 'text-slate-400 border-transparent hover:text-slate-200 hover:border-slate-600'
@@ -97,10 +97,10 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* ── Page content ───────────────────────────────────────── */}
       <main className="max-w-5xl mx-auto px-4 py-5">
         {tab === 'dashboard' && <AdminDashboard />}
         {tab === 'matches'   && <AdminMatchManager />}
+        {tab === 'bracket'   && <AdminBracketManager />}
         {tab === 'users'     && <AdminUserManager />}
       </main>
     </>

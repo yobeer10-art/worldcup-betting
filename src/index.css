@@ -12,7 +12,6 @@ body {
   direction: rtl;
   min-height: 100vh;
   background-color: #f0fdf4;
-  /* Subtle football-pitch dot grid */
   background-image: radial-gradient(
     circle at 1.5px 1.5px,
     rgba(16, 185, 129, 0.08) 1.5px,
@@ -36,25 +35,102 @@ body {
 
 /* ── Match card hover lift ─────────────────────────────── */
 .match-card {
-  transition: transform 0.22s cubic-bezier(.34,1.56,.64,1),
-              box-shadow 0.22s ease;
+  transition: transform 0.24s cubic-bezier(.34,1.56,.64,1),
+              box-shadow 0.24s ease,
+              border-color 0.24s ease;
 }
 .match-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 32px -4px rgba(0,0,0,0.12), 0 4px 8px -2px rgba(0,0,0,0.06);
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px -6px rgba(0,0,0,0.13), 0 4px 10px -2px rgba(0,0,0,0.07);
 }
 
-/* ── Bet button pulse on select ────────────────────────── */
+/* ── Win celebration — pulsing green ring ──────────────── */
+@keyframes win-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(52,211,153,0.70); }
+  50%  { box-shadow: 0 0 0 10px rgba(52,211,153,0.00); }
+  100% { box-shadow: 0 0 0 0   rgba(52,211,153,0.00); }
+}
+.win-celebrate {
+  animation: win-pulse 0.8s ease-out 3;
+  border-color: #34d399 !important;
+}
+
+/* ── Score bonus celebration — ring in gold ────────────── */
+@keyframes score-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(251,191,36,0.80); }
+  50%  { box-shadow: 0 0 0 12px rgba(251,191,36,0.00); }
+  100% { box-shadow: 0 0 0 0   rgba(251,191,36,0.00); }
+}
+.score-celebrate {
+  animation: score-pulse 0.8s ease-out 3;
+  border-color: #fbbf24 !important;
+}
+
+/* ── Floating +point badge ─────────────────────────────── */
+@keyframes float-up {
+  0%   { opacity: 1;   transform: translateY(0)     scale(1);   }
+  60%  { opacity: 1;   transform: translateY(-20px) scale(1.2); }
+  100% { opacity: 0;   transform: translateY(-40px) scale(0.8); }
+}
+.float-badge {
+  animation: float-up 1.2s ease-out forwards;
+  pointer-events: none;
+}
+
+/* ── Step 2 slide-in ───────────────────────────────────── */
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+.animate-slide-down {
+  animation: slide-down 0.2s ease-out;
+}
+
+/* ── Bet button pop on click ───────────────────────────── */
 @keyframes bet-pop {
   0%   { transform: scale(1); }
-  40%  { transform: scale(1.08); }
+  40%  { transform: scale(1.06); }
   100% { transform: scale(1); }
 }
-.bet-pop { animation: bet-pop 0.22s ease forwards; }
+.bet-pop { animation: bet-pop 0.2s ease forwards; }
 
 /* ── Live badge pulse ──────────────────────────────────── */
 @keyframes live-dot {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.3; }
+  50%      { opacity: 0.25; }
 }
 .live-dot { animation: live-dot 1.2s ease-in-out infinite; }
+
+/* ── Countdown digit flip ──────────────────────────────── */
+@keyframes digit-flip {
+  from { transform: translateY(-4px); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1;   }
+}
+.digit-flip { animation: digit-flip 0.25s ease; }
+
+/* ── Glassmorphism card ────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* ── Score input — number arrows hidden ───────────────── */
+.score-input::-webkit-outer-spin-button,
+.score-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.score-input[type=number]               { -moz-appearance: textfield; }
+
+/* ── Bracket connector lines ───────────────────────────── */
+.bracket-line {
+  position: relative;
+}
+.bracket-line::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 100%;
+  width: 16px;
+  height: 1px;
+  background: rgba(148, 163, 184, 0.5);
+}
