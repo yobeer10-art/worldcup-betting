@@ -197,7 +197,7 @@ export default function BracketPage() {
     setLoading(false)
   }, [user])
 
-  useEffect(() => { if (unlocked) fetchData() else setLoading(false) }, [fetchData, unlocked])
+  useEffect(() => { if (unlocked) { fetchData() } else { setLoading(false) } }, [fetchData, unlocked])
 
   // Group matches by round
   const byRound = {}
