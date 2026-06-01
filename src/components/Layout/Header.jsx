@@ -2,9 +2,10 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 
 const NAV = [
-  { to: '/', label: 'בית', icon: '🏠' },
-  { to: '/matches', label: 'משחקים', icon: '⚽' },
-  { to: '/leaderboard', label: 'דירוג', icon: '🏆' },
+  { to: '/',           label: 'בית',     icon: '🏠' },
+  { to: '/matches',    label: 'משחקים',  icon: '⚽' },
+  { to: '/groups',     label: 'בתים',    icon: '🏟️' },
+  { to: '/leaderboard',label: 'דירוג',   icon: '🏆' },
 ]
 
 export default function Header() {
