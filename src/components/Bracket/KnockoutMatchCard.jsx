@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { getFlag } from '../../lib/flags'
+import FlagImg from '../UI/FlagImg'
 
 export default function KnockoutMatchCard({ match, prediction, onSaved }) {
   const { user }   = useAuth()
@@ -11,7 +11,6 @@ export default function KnockoutMatchCard({ match, prediction, onSaved }) {
 
   const teamsKnown   = match.home_team && match.away_team
   const isFinished   = match.status === 'finished'
-  const isUpcoming   = match.status === 'upcoming' || match.status === 'live'
   const canPredict   = user && teamsKnown && !isFinished
 
   const winner = isFinished
@@ -50,25 +49,25 @@ export default function KnockoutMatchCard({ match, prediction, onSaved }) {
       <button
         onClick={() => pick(team)}
         disabled={!canPredict || saving}
-        className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border-2 transition-all duration-200 active:scale-95
-          ${correct ? 'border-emerald-400 bg-emerald-50 shadow-md shadow-emerald-200/60'
-            : wrong  ? 'border-rose-300 bg-rose-50 opacity-70'
-            : isLoser ? 'border-transparent bg-slate-50 opacity-50'
+        className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl border-2 transition-all duration-200 active:scale-95
+          ${correct  ? 'border-emerald-400 bg-emerald-50 shadow-md shadow-emerald-200/60'
+            : wrong   ? 'border-rose-300 bg-rose-50 opacity-70'
+            : isLoser  ? 'border-transparent bg-slate-50 opacity-50'
             : isWinner ? 'border-amber-400 bg-amber-50 shadow-md'
-            : picked  ? 'border-blue-400 bg-blue-50 shadow-md shadow-blue-200/50'
+            : picked   ? 'border-blue-400 bg-blue-50 shadow-md shadow-blue-200/50'
             : canPredict ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'
             : 'border-slate-100 bg-white'
           }
           ${saving ? 'cursor-wait' : ''}
         `}
       >
-        <span className="text-3xl leading-none">{getFlag(team)}</span>
-        <span className="text-xs font-bold text-slate-700 text-center leading-tight line-clamp-2 mt-0.5">{team}</span>
-        {correct  && <span className="text-[10px] font-bold text-emerald-600 mt-0.5">✅ ניחשת!</span>}
-        {wrong    && <span className="text-[10px] font-bold text-rose-500 mt-0.5">❌</span>}
-        {isWinner && !picked && <span className="text-[10px] font-bold text-amber-600 mt-0.5">🏆 ניצח</span>}
+        <FlagImg team={team} size="md" />
+        <span className="text-xs font-bold text-slate-700 text-center leading-tight line-clamp-2">{team}</span>
+        {correct  && <span className="text-[10px] font-bold text-emerald-600">✅ ניחשת!</span>}
+        {wrong    && <span className="text-[10px] font-bold text-rose-500">❌</span>}
+        {isWinner && !picked && <span className="text-[10px] font-bold text-amber-600">🏆 ניצח</span>}
         {!isFinished && picked && !justSaved && (
-          <span className="text-[10px] text-blue-500 font-semibold mt-0.5">✓ הניחוש שלך</span>
+          <span className="text-[10px] text-blue-500 font-semibold">✓ הניחוש שלך</span>
         )}
       </button>
     )

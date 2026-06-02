@@ -7,6 +7,7 @@ import AdminDashboard    from '../components/Admin/AdminDashboard'
 import AdminMatchManager from '../components/Admin/AdminMatchManager'
 import AdminUserManager  from '../components/Admin/AdminUserManager'
 import AdminBracketManager from '../components/Admin/AdminBracketManager'
+import AdminResetPanel from '../components/Admin/AdminResetPanel'
 import Spinner from '../components/UI/Spinner'
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
   { id: 'matches',   label: 'משחקים',      icon: '⚽' },
   { id: 'bracket',   label: 'מדרגי',       icon: '🎯' },
   { id: 'users',     label: 'משתמשים',     icon: '👥' },
+  { id: 'reset',     label: 'איפוס',       icon: '🔄' },
 ]
 
 function AccessDenied() {
@@ -102,6 +104,7 @@ export default function AdminPage() {
         {tab === 'matches'   && <AdminMatchManager />}
         {tab === 'bracket'   && <AdminBracketManager />}
         {tab === 'users'     && <AdminUserManager />}
+        {tab === 'reset'     && <AdminResetPanel />}
       </main>
     </>
   )

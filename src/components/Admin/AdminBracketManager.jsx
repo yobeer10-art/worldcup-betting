@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { getFlag } from '../../lib/flags'
+import FlagImg from '../UI/FlagImg'
 import Spinner from '../UI/Spinner'
 
 const ROUNDS = [
@@ -160,7 +160,7 @@ function BracketMatchRow({ match, onRefresh }) {
 
       {/* Team display / edit */}
       <div className="flex items-center gap-2 justify-center text-sm font-bold text-slate-700">
-        <span>{getFlag(match.home_team ?? '')}</span>
+        <FlagImg team={match.home_team ?? ''} size="sm" />
         <input className="flex-1 text-center text-sm border border-slate-200 rounded-lg px-1.5 py-1 focus:outline-none focus:border-green-400"
           value={homeTeam} onChange={e => setHomeTeam(e.target.value)} placeholder={match.home_source ?? 'בית'} />
         {match.status === 'finished' && match.home_score != null
@@ -168,7 +168,7 @@ function BracketMatchRow({ match, onRefresh }) {
           : <span className="text-slate-300 font-black">vs</span>}
         <input className="flex-1 text-center text-sm border border-slate-200 rounded-lg px-1.5 py-1 focus:outline-none focus:border-green-400"
           value={awayTeam} onChange={e => setAwayTeam(e.target.value)} placeholder={match.away_source ?? 'אורח'} />
-        <span>{getFlag(match.away_team ?? '')}</span>
+        <FlagImg team={match.away_team ?? ''} size="sm" />
       </div>
 
       {(homeTeam !== (match.home_team ?? '') || awayTeam !== (match.away_team ?? '')) && (

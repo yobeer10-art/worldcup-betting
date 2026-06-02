@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
-import { getFlag } from '../../lib/flags'
+import FlagImg from '../UI/FlagImg'
 
 /* ── Config ──────────────────────────────────────────────── */
 const BET_CFG = {
@@ -43,16 +43,39 @@ function fmtDate(iso) {
   })
 }
 
+/**
+ * Returns an error string if the score combination is logically invalid,
+ * OR null if everything is fine (including partially filled — no error shown
+ * while the user is still typing the second field).
+ *
+ * Call with onlySaveBlock=true to get the "save-blocking" flag without
+ * producing a user-visible message.
+ */
 function validateScore(pred, hs, as_, homeTeam, awayTeam) {
-  if (hs === '' && as_ === '') return null           // both blank → valid (optional)
-  if (hs === '' || as_ === '') return 'הזן ניחוש סכור לשתי הקבוצות'
-  const h = parseInt(hs), a = parseInt(as_)
+  // Both empty → optional scores not entered, totally fine
+  if (hs === '' && as_ === '') return null
+
+  // One empty, one filled → user is mid-typing; don't show an error yet
+  if (hs === '' || as_ === '') return null
+
+  const h = parseInt(hs, 10), a = parseInt(as_, 10)
   if (isNaN(h) || isNaN(a) || h < 0 || a < 0) return 'מספרים חיוביים בלבד (0-99)'
   if (!pred) return null
-  if (pred === 'home' && h <= a) return `לניצחון ${homeTeam}: הסכור שלהם חייב להיות גבוה יותר`
-  if (pred === 'away' && a <= h) return `לניצחון ${awayTeam}: הסכור שלהם חייב להיות גבוה יותר`
-  if (pred === 'draw' && h !== a) return 'לתיקו — שני הניחושים חייבים להיות שווים'
+  if (pred === 'home' && h <= a) return `לניצחון ${homeTeam}: סכור הבית חייב להיות גבוה יותר`
+  if (pred === 'away' && a <= h) return `לניצחון ${awayTeam}: סכור האורח חייב להיות גבוה יותר`
+  if (pred === 'draw' && h !== a) return 'לתיקו — שני הסכורים חייבים להיות שווים'
   return null
+}
+
+/**
+ * Whether saving should be blocked (score fields are in a half-filled or
+ * inconsistent state).  Separate from the visual error so the button goes
+ * grey while typing without showing a red message.
+ */
+function isSaveBlocked(pred, hs, as_, homeTeam, awayTeam) {
+  if (hs === '' && as_ === '') return false          // no scores → save with winner only
+  if (hs === '' || as_ === '') return true           // one missing → block silently
+  return validateScore(pred, hs, as_, homeTeam, awayTeam) !== null
 }
 
 /* ── Sub-components ──────────────────────────────────────── */
@@ -77,9 +100,9 @@ function StatusBadge({ status }) {
 
 function TeamBlock({ name, label }) {
   return (
-    <div className="flex-1 flex flex-col items-center gap-1.5 min-w-0 px-2">
-      <span className="text-5xl leading-none drop-shadow-md select-none">{getFlag(name)}</span>
-      <span className="font-extrabold text-slate-900 text-sm text-center leading-snug line-clamp-2 mt-0.5">{name}</span>
+    <div className="flex-1 flex flex-col items-center gap-2 min-w-0 px-2">
+      <FlagImg team={name} size="lg" className="drop-shadow-md" />
+      <span className="font-extrabold text-slate-900 text-sm text-center leading-snug line-clamp-2">{name}</span>
       <span className="text-[11px] text-slate-400 font-medium tracking-wide">{label}</span>
     </div>
   )
@@ -143,20 +166,26 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
     }
   }, [isFinished, userBet?.is_correct, userBet?.points_earned])
 
+  // Visible score error (only when BOTH fields are filled)
   const scoreErr = validateScore(pred, homeScore, awayScore, match.home_team, match.away_team)
+  // Whether the Save button should be disabled (includes half-filled state)
+  const saveBlocked = isSaveBlocked(pred, homeScore, awayScore, match.home_team, match.away_team)
 
   async function saveBet() {
     if (!pred) { setError('בחר תחילה מי ינצח'); return }
-    if (scoreErr) { setError(scoreErr); return }
+    if (saveBlocked) {
+      setError(scoreErr ?? 'הזן ניחוש סכור לשתי הקבוצות')
+      return
+    }
     setSaving(true); setError(null)
 
     const { error: err } = await supabase.from('bets').upsert(
       {
-        user_id:               user.id,
-        match_id:              match.id,
-        prediction:            pred,
-        predicted_home_score:  homeScore !== '' ? parseInt(homeScore) : null,
-        predicted_away_score:  awayScore !== '' ? parseInt(awayScore) : null,
+        user_id:              user.id,
+        match_id:             match.id,
+        prediction:           pred,
+        predicted_home_score: homeScore !== '' ? parseInt(homeScore, 10) : null,
+        predicted_away_score: awayScore !== '' ? parseInt(awayScore, 10) : null,
       },
       { onConflict: 'user_id,match_id' },
     )
@@ -170,17 +199,17 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
 
   // Score inputs auto-infer prediction when both are filled
   function handleScoreChange(side, value) {
-    const hs = side === 'home' ? value : homeScore
+    const hs  = side === 'home' ? value : homeScore
     const as_ = side === 'away' ? value : awayScore
     if (side === 'home') setHomeScore(value)
     else                 setAwayScore(value)
     setError(null)
 
-    const h = parseInt(hs), a = parseInt(as_)
+    const h = parseInt(hs, 10), a = parseInt(as_, 10)
     if (!isNaN(h) && !isNaN(a)) {
-      if (h > a) setPred('home')
+      if (h > a)      setPred('home')
       else if (a > h) setPred('away')
-      else if (h === a) setPred('draw')
+      else            setPred('draw')
     }
   }
 
@@ -262,20 +291,21 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
                 />
               </div>
             </div>
+            {/* Only show score error when BOTH fields are filled */}
             {scoreErr && (
               <p className="text-red-500 text-xs mt-1.5 text-center">{scoreErr}</p>
             )}
           </div>
         )}
 
-        {/* Error */}
+        {/* General error */}
         {error && <p className="text-red-500 text-xs text-center">{error}</p>}
 
-        {/* Save button (shows after winner picked) */}
+        {/* Save button */}
         {pred && (
           <button
             onClick={saveBet}
-            disabled={saving || !!scoreErr}
+            disabled={saving || saveBlocked}
             className="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-extrabold rounded-2xl text-sm shadow-lg shadow-emerald-300/40 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {saving ? (
@@ -304,9 +334,9 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
 
     // Betting closed — show saved bet or reason
     if (pred) {
-      const wonPts = userBet?.points_earned ?? 0
+      const wonPts  = userBet?.points_earned ?? 0
       const correct = userBet?.is_correct
-      const cfg = BET_CFG[pred]
+      const cfg     = BET_CFG[pred]
 
       return (
         <div className="px-4 pb-4">
@@ -322,12 +352,7 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                 {isFinished && <span>{correct ? (wonPts >= 3 ? '🌟' : '✅') : '❌'}</span>}
                 <span>{cfg.icon} {cfg.label}</span>
-                {pred !== 'draw' && homeScore !== '' && (
-                  <span className="text-slate-500 font-medium">
-                    · {homeScore}–{awayScore}
-                  </span>
-                )}
-                {pred === 'draw' && homeScore !== '' && (
+                {homeScore !== '' && (
                   <span className="text-slate-500 font-medium">
                     · {homeScore}–{awayScore}
                   </span>

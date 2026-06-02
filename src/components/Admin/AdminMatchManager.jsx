@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { getFlag } from '../../lib/flags'
+import FlagImg from '../UI/FlagImg'
 import Spinner from '../UI/Spinner'
 
 // ── Helpers ───────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ function EditRow({ match, onSave, onCancel }) {
       {/* Score inputs */}
       <div className="flex items-center gap-3 justify-center">
         <div className="text-center">
-          <div className="text-xs text-slate-500 mb-1">{getFlag(match.home_team)} {match.home_team}</div>
+          <div className="flex items-center justify-center gap-1 text-xs text-slate-500 mb-1"><FlagImg team={match.home_team} size="xs" /> {match.home_team}</div>
           <input
             type="number" min="0" max="99"
             value={homeScore}
@@ -88,7 +88,7 @@ function EditRow({ match, onSave, onCancel }) {
         </div>
         <span className="text-2xl text-slate-400 font-bold mt-5">—</span>
         <div className="text-center">
-          <div className="text-xs text-slate-500 mb-1">{getFlag(match.away_team)} {match.away_team}</div>
+          <div className="flex items-center justify-center gap-1 text-xs text-slate-500 mb-1"><FlagImg team={match.away_team} size="xs" /> {match.away_team}</div>
           <input
             type="number" min="0" max="99"
             value={awayScore}
@@ -206,8 +206,8 @@ function MatchRow({ match, onRefresh }) {
         {/* Teams + score */}
         <div className="flex items-center gap-3 mb-3">
           <div className="flex-1 text-right">
-            <span className="font-bold text-slate-800">
-              {getFlag(match.home_team)} {match.home_team}
+            <span className="inline-flex items-center gap-1.5 font-bold text-slate-800">
+              <FlagImg team={match.home_team} size="xs" /> {match.home_team}
             </span>
           </div>
 
@@ -229,8 +229,8 @@ function MatchRow({ match, onRefresh }) {
           )}
 
           <div className="flex-1 text-left">
-            <span className="font-bold text-slate-800">
-              {match.away_team} {getFlag(match.away_team)}
+            <span className="inline-flex items-center gap-1.5 font-bold text-slate-800">
+              {match.away_team} <FlagImg team={match.away_team} size="xs" />
             </span>
           </div>
         </div>

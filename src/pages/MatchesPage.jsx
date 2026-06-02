@@ -5,6 +5,8 @@ import Header from '../components/Layout/Header'
 import MatchCard from '../components/Matches/MatchCard'
 import Spinner from '../components/UI/Spinner'
 
+const SELF_RESET_DEADLINE = new Date('2026-06-11T00:00:00Z')
+
 const FILTERS = [
   { id: 'all',      label: 'הכל',       icon: '📋' },
   { id: 'upcoming', label: 'קרובים',    icon: '⏳' },
@@ -18,6 +20,12 @@ export default function MatchesPage() {
   const [userBets, setUserBets] = useState({})
   const [loading, setLoading]   = useState(true)
   const [filter, setFilter]     = useState('all')
+
+  // Self-reset state
+  const canSelfReset = user && new Date() < SELF_RESET_DEADLINE
+  const [resetStage,  setResetStage]  = useState(0) // 0=idle 1=confirm 2=done
+  const [resetBusy,   setResetBusy]   = useState(false)
+  const [resetMsg,    setResetMsg]    = useState(null)
 
   const fetchData = useCallback(async () => {
     const { data: matchData } = await supabase
@@ -40,6 +48,20 @@ export default function MatchesPage() {
   }, [user])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  async function doSelfReset() {
+    setResetBusy(true); setResetMsg(null)
+    const { error } = await supabase.rpc('reset_my_bets')
+    setResetBusy(false)
+    if (error) {
+      setResetMsg({ type: 'err', text: `שגיאה: ${error.message}` })
+      setResetStage(0)
+    } else {
+      setResetMsg({ type: 'ok', text: 'הניחושים שלך אופסו. ניתן לנחש מחדש!' })
+      setResetStage(2)
+      fetchData()
+    }
+  }
 
   const visible = filter === 'all' ? matches : matches.filter((m) => m.status === filter)
 
@@ -109,6 +131,61 @@ export default function MatchesPage() {
                 onBetPlaced={fetchData}
               />
             ))}
+          </div>
+        )}
+
+        {/* ── Self-reset (only before tournament start) ──── */}
+        {canSelfReset && (
+          <div className="mt-8 border-t border-slate-200 pt-6">
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🔄</span>
+                <div>
+                  <p className="text-sm font-bold text-slate-700">איפוס הניחושים שלי</p>
+                  <p className="text-xs text-slate-400">
+                    זמין עד תחילת הטורניר (11 ביוני 2026)
+                  </p>
+                </div>
+              </div>
+
+              {resetStage === 0 && (
+                <button
+                  onClick={() => setResetStage(1)}
+                  className="text-xs text-slate-400 hover:text-rose-500 border border-slate-200 hover:border-rose-300 hover:bg-rose-50 rounded-xl px-4 py-2 transition-colors font-medium"
+                >
+                  אפס את כל הניחושים שלי
+                </button>
+              )}
+
+              {resetStage === 1 && (
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-3">
+                  <p className="text-sm text-rose-700 font-semibold">
+                    האם אתה בטוח? הניחושים שלך יימחקו והנקודות שלך יתאפסו לאפס.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={doSelfReset}
+                      disabled={resetBusy}
+                      className="flex-1 text-sm bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-xl transition-colors disabled:opacity-60"
+                    >
+                      {resetBusy ? 'מאפס...' : 'כן, אפס הכל'}
+                    </button>
+                    <button
+                      onClick={() => setResetStage(0)}
+                      className="flex-1 text-sm bg-white border border-slate-200 text-slate-600 font-semibold py-2 rounded-xl hover:bg-slate-50 transition-colors"
+                    >
+                      ביטול
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {resetMsg && (
+                <p className={`text-sm font-medium ${resetMsg.type === 'ok' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {resetMsg.text}
+                </p>
+              )}
+            </div>
           </div>
         )}
       </main>
