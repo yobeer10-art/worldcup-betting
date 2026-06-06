@@ -41,11 +41,13 @@ function StatCell({ col, value }) {
 }
 
 /* ── Main component ─────────────────────────────────────────────── */
-export default function GroupCard({ group, allMatches, prediction, onPredictionSaved, user }) {
+// readOnly=true → suppress all prediction UI (used by TablesPage)
+export default function GroupCard({ group, allMatches, prediction, onPredictionSaved, user, readOnly = false }) {
   const [showModal, setShowModal] = useState(false)
   const standings = computeStandings(group.name, group.teams, allMatches)
   const locked    = isPredictionLocked()
   const hasPred   = !!prediction
+  const canPredict = user && !locked && !readOnly
 
   return (
     <>
@@ -69,23 +71,19 @@ export default function GroupCard({ group, allMatches, prediction, onPredictionS
           </div>
 
           <div className="relative">
-            {user ? (
-              locked ? (
-                <span className="text-[11px] text-emerald-300/60 flex items-center gap-1">
-                  🔒 נעול
-                </span>
-              ) : (
-                <button
-                  onClick={() => setShowModal(true)}
-                  className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all active:scale-95 ${
-                    hasPred
-                      ? 'bg-white/20 hover:bg-white/30 text-white border-white/20'
-                      : 'bg-white text-green-800 hover:bg-green-50 border-transparent shadow'
-                  }`}
-                >
-                  {hasPred ? '✏️ ערוך' : '🔮 נחש'}
-                </button>
-              )
+            {canPredict ? (
+              <button
+                onClick={() => setShowModal(true)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-xl border transition-all active:scale-95 ${
+                  hasPred
+                    ? 'bg-white/20 hover:bg-white/30 text-white border-white/20'
+                    : 'bg-white text-green-800 hover:bg-green-50 border-transparent shadow'
+                }`}
+              >
+                {hasPred ? '✏️ ערוך' : '🔮 נחש'}
+              </button>
+            ) : user && locked && !readOnly ? (
+              <span className="text-[11px] text-emerald-300/60 flex items-center gap-1">🔒 נעול</span>
             ) : null}
           </div>
         </div>
@@ -148,7 +146,7 @@ export default function GroupCard({ group, allMatches, prediction, onPredictionS
         </div>
 
         {/* ── User prediction footer ────────────────────────────── */}
-        {prediction ? (
+        {!readOnly && prediction ? (
           <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border-t border-emerald-100 flex-shrink-0">
             <span className="text-[11px] text-emerald-600 font-bold whitespace-nowrap">
               הניחוש שלך:
@@ -170,7 +168,7 @@ export default function GroupCard({ group, allMatches, prediction, onPredictionS
               </span>
             )}
           </div>
-        ) : user && !locked ? (
+        ) : !readOnly && canPredict ? (
           <div className="px-4 py-2.5 border-t border-dashed border-slate-200 bg-slate-50/60">
             <button
               onClick={() => setShowModal(true)}

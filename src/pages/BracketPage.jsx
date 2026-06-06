@@ -7,8 +7,8 @@ import Header from '../components/Layout/Header'
 import KnockoutMatchCard from '../components/Bracket/KnockoutMatchCard'
 import Spinner from '../components/UI/Spinner'
 
-// ── Phase B unlocks after group stage ends (July 1, 2026 00:00 UTC)
-const BRACKET_UNLOCK = new Date('2026-07-01T00:00:00Z')
+// ── Phase B unlocks after group stage ends (June 28, 2026 00:00 UTC)
+const BRACKET_UNLOCK = new Date('2026-06-28T00:00:00Z')
 function isBracketUnlocked() { return new Date() >= BRACKET_UNLOCK }
 
 // ── Round display config ──────────────────────────────────────
@@ -240,7 +240,7 @@ export default function BracketPage() {
             <div>
               <h2 className="font-extrabold text-base">שלב ב׳ — מדרגי הנוקאאוט</h2>
               <p className="text-slate-400 text-xs">
-                נפתח לאחר סיום שלב הבתים (1 ביולי 2026)
+                נפתח לאחר סיום שלב הבתים (28 ביוני 2026)
               </p>
             </div>
             <span className={`mr-auto text-xs font-bold px-2.5 py-1 rounded-full ${
@@ -270,7 +270,7 @@ export default function BracketPage() {
               <h3 className="font-extrabold text-slate-800 text-lg mb-1">
                 המדרגי נפתח בעוד:
               </h3>
-              <p className="text-xs text-slate-400">1 ביולי 2026 · לאחר סיום כל משחקי שלב הבתים</p>
+              <p className="text-xs text-slate-400">28 ביוני 2026 · לאחר סיום כל משחקי שלב הבתים</p>
             </div>
             <Countdown />
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 font-medium">

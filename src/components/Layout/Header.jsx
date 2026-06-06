@@ -3,12 +3,11 @@ import { useAuth } from '../../context/AuthContext'
 import { useAdmin } from '../../context/AdminContext'
 
 const NAV = [
-  { to: '/',            label: 'בית',    icon: '🏠' },
-  { to: '/matches',     label: 'משחקים', icon: '⚽' },
-  { to: '/groups',      label: 'בתים',   icon: '🏟️' },
-  { to: '/bracket',     label: 'מדרגי',  icon: '🎯' },
-  { to: '/champion',    label: 'אלופה',  icon: '🥇', gold: true },
-  { to: '/leaderboard', label: 'דירוג',  icon: '🏆' },
+  { to: '/matches',       label: 'משחקים',         icon: '⚽' },
+  { to: '/pretournament', label: 'הימורים מקדימים', icon: '🔮' },
+  { to: '/bracket',       label: 'ברקט',            icon: '🎯' },
+  { to: '/tables',        label: 'טבלאות',          icon: '📊' },
+  { to: '/leaderboard',   label: 'דירוג',           icon: '🏆' },
 ]
 
 export default function Header() {
@@ -26,14 +25,14 @@ export default function Header() {
         <div className="max-w-lg mx-auto px-4">
 
           {/* Top row */}
-          <div className="flex items-center justify-between h-14">
-            <Link to="/" className="flex items-center gap-2.5 group select-none shrink-0">
-              <span className="text-2xl transition-transform duration-300 group-hover:rotate-[20deg]">⚽</span>
+          <div className="flex items-center justify-between h-12">
+            <Link to="/matches" className="flex items-center gap-2 group select-none shrink-0">
+              <span className="text-xl transition-transform duration-300 group-hover:rotate-[20deg]">⚽</span>
               <div>
-                <div className="font-extrabold text-white text-[15px] leading-none tracking-tight">
+                <div className="font-extrabold text-white text-[14px] leading-none tracking-tight">
                   מונדיאל 2026
                 </div>
-                <div className="text-emerald-300 text-[10px] leading-none mt-[3px] tracking-wide">
+                <div className="text-emerald-300 text-[9px] leading-none mt-[2px] tracking-wide">
                   USA · Canada · Mexico
                 </div>
               </div>
@@ -43,22 +42,10 @@ export default function Header() {
             <div className="flex items-center gap-1.5">
               {user ? (
                 <>
-                  {isAdmin && (
-                    <Link
-                      to="/admin"
-                      className={`hidden sm:flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg transition-colors border ${
-                        pathname === '/admin'
-                          ? 'bg-amber-400 text-amber-900 border-amber-300'
-                          : 'bg-white/10 hover:bg-white/20 text-amber-300 border-white/10'
-                      }`}
-                    >
-                      🔐 ניהול
-                    </Link>
-                  )}
                   {profile?.total_points != null && (
                     <div className="flex items-center gap-1 bg-white/10 border border-white/10 px-2 py-1 rounded-lg">
-                      <span className="text-sm">⭐</span>
-                      <span className="text-white font-extrabold text-sm tabular-nums">
+                      <span className="text-xs">⭐</span>
+                      <span className="text-white font-extrabold text-xs tabular-nums">
                         {profile.total_points}
                       </span>
                     </div>
@@ -68,7 +55,7 @@ export default function Header() {
                   </span>
                   <button
                     onClick={signOut}
-                    className="text-xs bg-white/10 hover:bg-white/20 active:bg-white/30 text-white px-2.5 py-1.5 rounded-lg transition-colors border border-white/10"
+                    className="text-xs bg-white/10 hover:bg-white/20 active:bg-white/30 text-white px-2 py-1.5 rounded-lg transition-colors border border-white/10"
                   >
                     יציאה
                   </button>
@@ -76,7 +63,7 @@ export default function Header() {
               ) : (
                 <Link
                   to="/auth"
-                  className="text-sm bg-white text-green-900 hover:bg-green-50 px-4 py-1.5 rounded-lg font-bold shadow-lg transition-colors"
+                  className="text-sm bg-white text-green-900 hover:bg-green-50 px-3 py-1.5 rounded-lg font-bold shadow-lg transition-colors"
                 >
                   כניסה
                 </Link>
@@ -84,40 +71,36 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Nav tabs — 6 items, compact on mobile */}
+          {/* Nav tabs */}
           <nav className="flex">
-            {NAV.map(({ to, label, icon, gold }) => {
-              const active = pathname === to
+            {NAV.map(({ to, label, icon }) => {
+              const active = pathname === to || (to === '/pretournament' && ['/pretournament','/groups','/champion'].includes(pathname))
               return (
                 <Link
                   key={to}
                   to={to}
-                  className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-2 text-[10px] sm:text-sm font-semibold border-b-2 transition-all duration-200 ${
+                  className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1.5 text-[9.5px] sm:text-xs font-semibold border-b-2 transition-all duration-200 ${
                     active
-                      ? gold
-                        ? 'text-amber-300 border-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]'
-                        : 'text-white border-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]'
-                      : gold
-                        ? 'text-amber-400/70 border-transparent hover:text-amber-300 hover:border-amber-500/40'
-                        : 'text-green-300/60 border-transparent hover:text-white hover:border-green-500/40'
+                      ? 'text-white border-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]'
+                      : 'text-green-300/60 border-transparent hover:text-white hover:border-green-500/40'
                   }`}
                 >
-                  <span className={`text-base sm:text-sm ${active ? '' : 'opacity-70'}`}>{icon}</span>
-                  <span className="leading-none">{label}</span>
+                  <span className={`text-sm sm:text-xs ${active ? '' : 'opacity-70'}`}>{icon}</span>
+                  <span className="leading-none text-center">{label}</span>
                 </Link>
               )
             })}
-            {/* Admin tab (mobile only) */}
+            {/* Admin tab — only for admins */}
             {isAdmin && (
               <Link
                 to="/admin"
-                className={`sm:hidden flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-semibold border-b-2 transition-all duration-200 ${
+                className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1.5 text-[9.5px] sm:text-xs font-semibold border-b-2 transition-all duration-200 ${
                   pathname === '/admin'
                     ? 'text-amber-300 border-amber-400'
-                    : 'text-green-300/40 border-transparent hover:text-amber-300'
+                    : 'text-amber-400/50 border-transparent hover:text-amber-300 hover:border-amber-500/40'
                 }`}
               >
-                <span className="text-base opacity-70">🔐</span>
+                <span className="text-sm sm:text-xs opacity-70">🔐</span>
                 <span className="leading-none">ניהול</span>
               </Link>
             )}
