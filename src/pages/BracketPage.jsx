@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
-import { GROUPS, isPredictionLocked } from '../lib/groups'
 import Header from '../components/Layout/Header'
 import KnockoutMatchCard from '../components/Bracket/KnockoutMatchCard'
 import Spinner from '../components/UI/Spinner'
@@ -53,61 +52,6 @@ function Countdown() {
       <Digit n={mins}  label="דקות" />
       <span className="text-slate-300 text-2xl font-black pb-5">:</span>
       <Digit n={secs}  label="שניות" />
-    </div>
-  )
-}
-
-// ── Phase A summary card ──────────────────────────────────────
-function PhaseACard({ user }) {
-  const [predCount, setPredCount] = useState(null)
-  useEffect(() => {
-    if (!user) return
-    supabase.from('group_predictions').select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .then(({ count }) => setPredCount(count ?? 0))
-  }, [user])
-
-  const locked = isPredictionLocked()
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center text-lg shadow-sm">
-          🏟️
-        </div>
-        <div>
-          <h3 className="font-extrabold text-slate-800 text-sm">שלב א׳ — ניחושי בתים</h3>
-          <p className="text-xs text-slate-400">מי ינצח בכל בית?</p>
-        </div>
-        <span className={`mr-auto text-xs font-bold px-2.5 py-1 rounded-full ${
-          locked ? 'bg-slate-100 text-slate-500' : 'bg-emerald-100 text-emerald-700'
-        }`}>
-          {locked ? '🔒 נעול' : '✅ פתוח'}
-        </span>
-      </div>
-
-      {user ? (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-600">
-            ניחשת{' '}
-            <span className="font-extrabold text-emerald-600 text-lg">{predCount ?? '…'}</span>
-            {' '}מתוך{' '}
-            <span className="font-bold">{GROUPS.length}</span> בתים
-          </p>
-          <Link
-            to="/groups"
-            className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl transition-colors"
-          >
-            {locked || predCount === GROUPS.length ? 'צפה בבתים' : 'השלם ניחושים'}
-          </Link>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-500">התחבר כדי לנחש</p>
-          <Link to="/auth" className="text-xs bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-xl">
-            כניסה
-          </Link>
-        </div>
-      )}
     </div>
   )
 }
@@ -219,26 +163,23 @@ export default function BracketPage() {
 
         {/* Page title */}
         <div className="flex items-center gap-3">
-          <span className="text-3xl">🏆</span>
+          <span className="text-3xl">🎯</span>
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-800 leading-none">שלב הנוקאאוט</h1>
+            <h1 className="text-2xl font-extrabold text-slate-800 leading-none">ברקט הנוקאאוט</h1>
             <p className="text-slate-400 text-xs mt-0.5">
-              שלב הבתים → שלב 32 → גמר · מונדיאל 2026
+              שלב 32 → גמר · מונדיאל 2026
             </p>
           </div>
         </div>
 
-        {/* Phase A */}
-        <PhaseACard user={user} />
-
-        {/* Phase B header */}
+        {/* Bracket header */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white shadow-xl">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-lg shadow-md">
               🎯
             </div>
             <div>
-              <h2 className="font-extrabold text-base">שלב ב׳ — מדרגי הנוקאאוט</h2>
+              <h2 className="font-extrabold text-base">מדרגי הנוקאאוט</h2>
               <p className="text-slate-400 text-xs">
                 נפתח לאחר סיום שלב הבתים (28 ביוני 2026)
               </p>
@@ -274,8 +215,9 @@ export default function BracketPage() {
             </div>
             <Countdown />
             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700 font-medium">
-              בינתיים — נחש מי יעלה מכל בית בעמוד{' '}
-              <Link to="/groups" className="font-extrabold underline">הבתים</Link>!
+              בינתיים — בחר את{' '}
+              <Link to="/champion" className="font-extrabold underline">אלופת הטורניר</Link>
+              {' '}שלך! (25 נקודות)
             </div>
           </div>
         )}
