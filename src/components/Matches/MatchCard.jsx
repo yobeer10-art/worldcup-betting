@@ -29,29 +29,26 @@ const STRIP_CLS = {
   finished: 'bg-gradient-to-r from-slate-300 to-slate-400',
 }
 
-const TV_CHANNELS = ['כאן 11', 'כאן BOX', 'ספורט 1']
-
 /* ── Helpers ─────────────────────────────────────────────── */
-function fmtDateUTC(iso) {
+/** Israel date+time — stored with +03 offset, shown as-is */
+function israelDateTime(iso) {
   return new Date(iso).toLocaleString('he-IL', {
-    weekday: 'short', day: 'numeric', month: 'short',
-    hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
-  })
-}
-
-/** Kickoff time in Israel timezone (Asia/Jerusalem handles DST) */
-function israelTime(iso) {
-  return new Date(iso).toLocaleTimeString('he-IL', {
     timeZone: 'Asia/Jerusalem',
+    weekday: 'short', day: 'numeric', month: 'short',
     hour: '2-digit', minute: '2-digit', hour12: false,
   })
 }
-function israelDateShort(iso) {
-  const d = new Date(iso)
-  return d.toLocaleDateString('he-IL', {
-    timeZone: 'Asia/Jerusalem',
-    day: 'numeric', month: 'short',
-  })
+
+/**
+ * Broadcast channel pills derived from match.broadcast column:
+ *   'כאן 11' → כאן 11 + כאן BOX
+ *   'BOX'    → כאן BOX + ספורט 1
+ *   null/other → כאן BOX + ספורט 1 (safe fallback)
+ */
+function broadcastChannels(broadcast) {
+  return broadcast === 'כאן 11'
+    ? ['כאן 11', 'כאן BOX']
+    : ['כאן BOX', 'ספורט 1']
 }
 
 function validateScore(pred, hs, as_, homeTeam, awayTeam) {
@@ -421,20 +418,13 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
       {/* Top colour strip */}
       <div className={`h-1.5 w-full ${STRIP_CLS[match.status] ?? STRIP_CLS.upcoming}`} />
 
-      {/* ── Header (Feature 5: Israel time + TV) ─────────── */}
+      {/* ── Header: Israel time + broadcast channels ─────── */}
       <div className="px-4 pt-2.5 pb-2 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 space-y-1.5">
         <div className="flex items-start justify-between gap-2">
-          {/* Left: times */}
+          {/* Left: Israel date + time */}
           <div className="min-w-0">
-            <div className="text-[11px] text-slate-400 font-medium">{fmtDateUTC(match.match_date)}</div>
-            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-              <span className="text-[12px] text-emerald-700 font-extrabold tabular-nums">
-                🕐 {israelTime(match.match_date)}
-              </span>
-              <span className="text-[10px] text-slate-500 font-medium">שעון ישראל</span>
-              <span className="text-[10px] text-slate-300">
-                ({israelDateShort(match.match_date)})
-              </span>
+            <div className="text-[12px] text-slate-700 font-semibold tabular-nums leading-snug">
+              🕐 {israelDateTime(match.match_date)}
             </div>
           </div>
           {/* Right: badges */}
@@ -451,13 +441,19 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
           </div>
         </div>
 
-        {/* TV channels row */}
+        {/* Broadcast channels — per-match from DB */}
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] text-slate-300">📺</span>
-          {TV_CHANNELS.map(ch => (
+          {broadcastChannels(match.broadcast).map(ch => (
             <span
               key={ch}
-              className="text-[10px] bg-sky-50 text-sky-600 font-semibold px-1.5 py-0.5 rounded-md border border-sky-100"
+              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
+                ch === 'כאן 11'
+                  ? 'bg-blue-50 text-blue-700 border-blue-200'
+                  : ch === 'כאן BOX'
+                    ? 'bg-sky-50 text-sky-600 border-sky-100'
+                    : 'bg-orange-50 text-orange-600 border-orange-100'
+              }`}
             >
               {ch}
             </span>
