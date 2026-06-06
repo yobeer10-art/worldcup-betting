@@ -7,25 +7,19 @@ import FlagImg from '../UI/FlagImg'
 /* ── Config ──────────────────────────────────────────────── */
 const BET_CFG = {
   home: {
-    label: 'ניצחון בית',
-    icon:  '🏠',
+    label: 'ניצחון בית',  icon: '🏠',
     idle:   'bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-100 hover:border-sky-300',
     active: 'bg-gradient-to-br from-sky-500 to-blue-600 text-white border-transparent shadow-lg shadow-sky-300/40',
-    resultBg: 'bg-sky-50 border-sky-200 text-sky-800',
   },
   draw: {
-    label: 'תיקו',
-    icon:  '🤝',
+    label: 'תיקו',         icon: '🤝',
     idle:   'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 hover:border-amber-300',
     active: 'bg-gradient-to-br from-amber-400 to-orange-500 text-white border-transparent shadow-lg shadow-amber-300/40',
-    resultBg: 'bg-amber-50 border-amber-200 text-amber-800',
   },
   away: {
-    label: 'ניצחון אורח',
-    icon:  '✈️',
+    label: 'ניצחון אורח', icon: '✈️',
     idle:   'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 hover:border-violet-300',
     active: 'bg-gradient-to-br from-violet-500 to-purple-600 text-white border-transparent shadow-lg shadow-violet-300/40',
-    resultBg: 'bg-violet-50 border-violet-200 text-violet-800',
   },
 }
 
@@ -35,29 +29,34 @@ const STRIP_CLS = {
   finished: 'bg-gradient-to-r from-slate-300 to-slate-400',
 }
 
+const TV_CHANNELS = ['כאן 11', 'כאן BOX', 'ספורט 1']
+
 /* ── Helpers ─────────────────────────────────────────────── */
-function fmtDate(iso) {
+function fmtDateUTC(iso) {
   return new Date(iso).toLocaleString('he-IL', {
     weekday: 'short', day: 'numeric', month: 'short',
-    hour: '2-digit', minute: '2-digit',
+    hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
   })
 }
 
-/**
- * Returns an error string if the score combination is logically invalid,
- * OR null if everything is fine (including partially filled — no error shown
- * while the user is still typing the second field).
- *
- * Call with onlySaveBlock=true to get the "save-blocking" flag without
- * producing a user-visible message.
- */
+/** Kickoff time in Israel timezone (Asia/Jerusalem handles DST) */
+function israelTime(iso) {
+  return new Date(iso).toLocaleTimeString('he-IL', {
+    timeZone: 'Asia/Jerusalem',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+}
+function israelDateShort(iso) {
+  const d = new Date(iso)
+  return d.toLocaleDateString('he-IL', {
+    timeZone: 'Asia/Jerusalem',
+    day: 'numeric', month: 'short',
+  })
+}
+
 function validateScore(pred, hs, as_, homeTeam, awayTeam) {
-  // Both empty → optional scores not entered, totally fine
   if (hs === '' && as_ === '') return null
-
-  // One empty, one filled → user is mid-typing; don't show an error yet
-  if (hs === '' || as_ === '') return null
-
+  if (hs === '' || as_ === '') return null   // mid-typing — silent
   const h = parseInt(hs, 10), a = parseInt(as_, 10)
   if (isNaN(h) || isNaN(a) || h < 0 || a < 0) return 'מספרים חיוביים בלבד (0-99)'
   if (!pred) return null
@@ -66,16 +65,56 @@ function validateScore(pred, hs, as_, homeTeam, awayTeam) {
   if (pred === 'draw' && h !== a) return 'לתיקו — שני הסכורים חייבים להיות שווים'
   return null
 }
-
-/**
- * Whether saving should be blocked (score fields are in a half-filled or
- * inconsistent state).  Separate from the visual error so the button goes
- * grey while typing without showing a red message.
- */
 function isSaveBlocked(pred, hs, as_, homeTeam, awayTeam) {
-  if (hs === '' && as_ === '') return false          // no scores → save with winner only
-  if (hs === '' || as_ === '') return true           // one missing → block silently
+  if (hs === '' && as_ === '') return false
+  if (hs === '' || as_ === '') return true
   return validateScore(pred, hs, as_, homeTeam, awayTeam) !== null
+}
+
+/* ── Community odds bar ──────────────────────────────────── */
+function CommunityBar({ stats, isLocked }) {
+  if (!stats) return null
+  const total = (stats.home_count || 0) + (stats.draw_count || 0) + (stats.away_count || 0)
+  if (total === 0) return null
+
+  const pct = n => Math.round(((n || 0) / total) * 100)
+  const hp = pct(stats.home_count), dp = pct(stats.draw_count), ap = pct(stats.away_count)
+
+  return (
+    <div className="px-4 pb-3 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+          {isLocked
+            ? `👥 ניחושי הקהילה · ${total} משתתפים`
+            : `📊 יחס ניחושים · ${total} משתתפים`}
+        </span>
+      </div>
+      {/* Segmented bar */}
+      <div className="flex h-2.5 rounded-full overflow-hidden gap-px bg-slate-100">
+        {hp > 0 && <div className="bg-sky-400   transition-all duration-700" style={{ width: `${hp}%` }} />}
+        {dp > 0 && <div className="bg-amber-400 transition-all duration-700" style={{ width: `${dp}%` }} />}
+        {ap > 0 && <div className="bg-violet-400 transition-all duration-700" style={{ width: `${ap}%` }} />}
+      </div>
+      {/* Labels */}
+      <div className="flex justify-between text-[10px]">
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-sky-400 inline-block" />
+          <span className="font-bold text-slate-700">{hp}%</span>
+          {isLocked && <span className="text-slate-400">בית</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+          <span className="font-bold text-slate-700">{dp}%</span>
+          {isLocked && <span className="text-slate-400">תיקו</span>}
+        </div>
+        <div className="flex items-center gap-1">
+          {isLocked && <span className="text-slate-400">אורח</span>}
+          <span className="font-bold text-slate-700">{ap}%</span>
+          <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /* ── Sub-components ──────────────────────────────────────── */
@@ -108,7 +147,6 @@ function TeamBlock({ name, label }) {
   )
 }
 
-/* ── Floating +pts badge ─────────────────────────────────── */
 function FloatingBadge({ pts, onDone }) {
   return (
     <div
@@ -123,10 +161,32 @@ function FloatingBadge({ pts, onDone }) {
 }
 
 /* ── Main component ──────────────────────────────────────── */
-export default function MatchCard({ match, userBet, onBetPlaced }) {
+export default function MatchCard({ match, userBet, onBetPlaced, communityStats }) {
   const { user } = useAuth()
 
-  // Prediction state (synced from userBet on mount)
+  // ── Live clock for auto-lock countdown ───────────────────
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const matchMs = new Date(match.match_date).getTime()
+    const remaining = matchMs - Date.now()
+    if (remaining <= 0) return
+    const interval = remaining < 3_600_000 ? 10_000 : 60_000
+    const t = setInterval(() => setNow(Date.now()), interval)
+    return () => clearInterval(t)
+  }, [match.match_date])
+
+  const matchMs      = new Date(match.match_date).getTime()
+  const msToKickoff  = matchMs - now
+  const minsToKick   = Math.floor(msToKickoff / 60_000)
+
+  // Feature 1: auto-lock 10 min before kickoff
+  const isAutoLocked  = match.status === 'upcoming' && minsToKick > 0 && minsToKick <= 10
+  const isCountdown   = match.status === 'upcoming' && !match.is_locked && minsToKick > 10 && minsToKick <= 60
+  const isBettingOpen = match.status === 'upcoming' && !match.is_locked && !isAutoLocked && msToKickoff > 0
+  const isLocked      = match.is_locked || isAutoLocked || match.status !== 'upcoming'
+  const isFinished    = match.status === 'finished'
+
+  // ── Bet state ─────────────────────────────────────────────
   const [pred,       setPred]      = useState(userBet?.prediction ?? null)
   const [homeScore,  setHomeScore] = useState(
     userBet?.predicted_home_score != null ? String(userBet.predicted_home_score) : ''
@@ -140,13 +200,7 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
   const [showFloat,  setShowFloat] = useState(false)
   const [celebClass, setCelebClass] = useState('')
   const didCelebrate = useRef(false)
-  const cardRef      = useRef(null)
 
-  const isBettingOpen = match.status === 'upcoming' && !match.is_locked &&
-                        new Date(match.match_date) > new Date()
-  const isFinished    = match.status === 'finished'
-
-  // Sync prop → state when parent refetches
   useEffect(() => {
     if (!isBettingOpen) {
       setPred(userBet?.prediction ?? null)
@@ -155,7 +209,6 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
     }
   }, [userBet, isBettingOpen])
 
-  // Celebration on win
   useEffect(() => {
     if (isFinished && userBet?.is_correct && !didCelebrate.current) {
       didCelebrate.current = true
@@ -166,19 +219,13 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
     }
   }, [isFinished, userBet?.is_correct, userBet?.points_earned])
 
-  // Visible score error (only when BOTH fields are filled)
-  const scoreErr = validateScore(pred, homeScore, awayScore, match.home_team, match.away_team)
-  // Whether the Save button should be disabled (includes half-filled state)
+  const scoreErr   = validateScore(pred, homeScore, awayScore, match.home_team, match.away_team)
   const saveBlocked = isSaveBlocked(pred, homeScore, awayScore, match.home_team, match.away_team)
 
   async function saveBet() {
     if (!pred) { setError('בחר תחילה מי ינצח'); return }
-    if (saveBlocked) {
-      setError(scoreErr ?? 'הזן ניחוש סכור לשתי הקבוצות')
-      return
-    }
+    if (saveBlocked) { setError(scoreErr ?? 'הזן ניחוש סכור לשתי הקבוצות'); return }
     setSaving(true); setError(null)
-
     const { error: err } = await supabase.from('bets').upsert(
       {
         user_id:              user.id,
@@ -191,20 +238,17 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
     )
     setSaving(false)
     if (err) { setError('שגיאה בשמירת הניחוש. נסה שוב.'); return }
-
     setJustSaved(true)
     setTimeout(() => setJustSaved(false), 2000)
     onBetPlaced?.()
   }
 
-  // Score inputs auto-infer prediction when both are filled
   function handleScoreChange(side, value) {
     const hs  = side === 'home' ? value : homeScore
     const as_ = side === 'away' ? value : awayScore
     if (side === 'home') setHomeScore(value)
     else                 setAwayScore(value)
     setError(null)
-
     const h = parseInt(hs, 10), a = parseInt(as_, 10)
     if (!isNaN(h) && !isNaN(a)) {
       if (h > a)      setPred('home')
@@ -213,8 +257,7 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
     }
   }
 
-  /* ---------- render sections ---------- */
-
+  /* ── Betting section renderer ────────────────────────────── */
   function renderBettingSection() {
     if (!user) return (
       <div className="px-4 py-3 text-center text-sm text-slate-400">
@@ -225,14 +268,13 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
 
     if (isBettingOpen) return (
       <div className="px-4 pb-4 space-y-3">
-
         {/* Step 1 */}
         <div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-2">
             שלב 1 — מי ינצח? *
           </p>
           <div className="grid grid-cols-3 gap-2">
-            {(['home', 'draw', 'away']).map(key => {
+            {['home', 'draw', 'away'].map(key => {
               const cfg = BET_CFG[key]
               const isActive = pred === key
               return (
@@ -256,7 +298,7 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
           </div>
         </div>
 
-        {/* Step 2 — appears after winner is picked */}
+        {/* Step 2 */}
         {pred && (
           <div className="animate-slide-down">
             <div className="flex items-center justify-between mb-2">
@@ -267,58 +309,46 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
                 +2 נק׳ בונוס!
               </span>
             </div>
-
             <div className="flex items-center gap-2 bg-slate-50 rounded-2xl p-3 border border-slate-200">
               <div className="flex-1 text-center">
                 <div className="text-[11px] text-slate-500 mb-1 truncate">{match.home_team}</div>
                 <input
-                  type="number" min="0" max="20"
-                  value={homeScore}
+                  type="number" min="0" max="20" value={homeScore}
                   onChange={e => handleScoreChange('home', e.target.value)}
                   placeholder="0"
-                  className="score-input w-full text-center text-2xl font-extrabold bg-white border-2 border-slate-200 focus:border-emerald-400 rounded-xl p-2 outline-none transition-colors tabular-nums"
+                  className="score-input w-full text-center text-2xl font-extrabold bg-white border-2 border-slate-200 focus:border-emerald-400 rounded-xl p-2 outline-none transition-colors"
                 />
               </div>
               <div className="text-slate-300 font-black text-xl flex-shrink-0 mt-4">—</div>
               <div className="flex-1 text-center">
                 <div className="text-[11px] text-slate-500 mb-1 truncate">{match.away_team}</div>
                 <input
-                  type="number" min="0" max="20"
-                  value={awayScore}
+                  type="number" min="0" max="20" value={awayScore}
                   onChange={e => handleScoreChange('away', e.target.value)}
                   placeholder="0"
-                  className="score-input w-full text-center text-2xl font-extrabold bg-white border-2 border-slate-200 focus:border-emerald-400 rounded-xl p-2 outline-none transition-colors tabular-nums"
+                  className="score-input w-full text-center text-2xl font-extrabold bg-white border-2 border-slate-200 focus:border-emerald-400 rounded-xl p-2 outline-none transition-colors"
                 />
               </div>
             </div>
-            {/* Only show score error when BOTH fields are filled */}
-            {scoreErr && (
-              <p className="text-red-500 text-xs mt-1.5 text-center">{scoreErr}</p>
-            )}
+            {scoreErr && <p className="text-red-500 text-xs mt-1.5 text-center">{scoreErr}</p>}
           </div>
         )}
 
-        {/* General error */}
         {error && <p className="text-red-500 text-xs text-center">{error}</p>}
 
-        {/* Save button */}
         {pred && (
           <button
             onClick={saveBet}
             disabled={saving || saveBlocked}
-            className="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-extrabold rounded-2xl text-sm shadow-lg shadow-emerald-300/40 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="w-full py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white font-extrabold rounded-2xl text-sm shadow-lg shadow-emerald-300/40 transition-all active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            {saving ? (
-              <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> שומר...</>
-            ) : justSaved ? (
-              '✅ נשמר!'
-            ) : (
-              '🎯 שמור ניחוש'
-            )}
+            {saving
+              ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> שומר...</>
+              : justSaved ? '✅ נשמר!'
+              : '🎯 שמור ניחוש'}
           </button>
         )}
 
-        {/* Current bet summary */}
         {!justSaved && userBet?.prediction && (
           <div className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
             <span>ניחוש קודם:</span>
@@ -332,14 +362,13 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
       </div>
     )
 
-    // Betting closed — show saved bet or reason
+    // Closed — show saved bet
     if (pred) {
       const wonPts  = userBet?.points_earned ?? 0
       const correct = userBet?.is_correct
       const cfg     = BET_CFG[pred]
-
       return (
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-3">
           <div className={`rounded-2xl px-4 py-3 border flex flex-col gap-1.5 ${
             !isFinished ? 'bg-slate-50 border-slate-200'
             : correct
@@ -353,9 +382,7 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
                 {isFinished && <span>{correct ? (wonPts >= 3 ? '🌟' : '✅') : '❌'}</span>}
                 <span>{cfg.icon} {cfg.label}</span>
                 {homeScore !== '' && (
-                  <span className="text-slate-500 font-medium">
-                    · {homeScore}–{awayScore}
-                  </span>
+                  <span className="text-slate-500 font-medium">· {homeScore}–{awayScore}</span>
                 )}
               </div>
               {isFinished && correct && (
@@ -365,62 +392,101 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
               )}
             </div>
             {isFinished && correct && wonPts >= 3 && (
-              <p className="text-xs text-amber-700 font-semibold">
-                🌟 תוצאה מדויקת! בונוס נקודות!
-              </p>
+              <p className="text-xs text-amber-700 font-semibold">🌟 תוצאה מדויקת! בונוס נקודות!</p>
             )}
           </div>
         </div>
       )
     }
 
+    // No bet placed + betting closed
     return (
-      <div className="px-4 pb-4">
+      <div className="px-4 pb-3">
         <p className="text-center text-sm text-slate-400 py-1">
-          {match.status === 'live' ? '🔴 המשחק כבר התחיל' : '🔒 ההגשות נסגרו'}
+          {match.status === 'live' ? '🔴 המשחק כבר התחיל'
+            : isAutoLocked ? '🔒 ההגשות ננעלו'
+            : '🔒 ההגשות נסגרו'}
         </p>
       </div>
     )
   }
 
-  /* ---------- card ---------- */
+  /* ── Card ────────────────────────────────────────────────── */
   return (
-    <div
-      ref={cardRef}
-      className={`match-card relative bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-md ${celebClass}`}
-    >
-      {/* Floating badge */}
+    <div className={`match-card relative bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-md ${celebClass}`}>
       {showFloat && (
-        <FloatingBadge
-          pts={userBet?.points_earned ?? 1}
-          onDone={() => setShowFloat(false)}
-        />
+        <FloatingBadge pts={userBet?.points_earned ?? 1} onDone={() => setShowFloat(false)} />
       )}
 
-      {/* Top strip */}
+      {/* Top colour strip */}
       <div className={`h-1.5 w-full ${STRIP_CLS[match.status] ?? STRIP_CLS.upcoming}`} />
 
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100">
-        <span className="text-[12px] text-slate-400 font-medium">{fmtDate(match.match_date)}</span>
-        <div className="flex items-center gap-2">
-          {match.group_name && (
-            <span className="text-[11px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full">
-              בית {match.group_name}
+      {/* ── Header (Feature 5: Israel time + TV) ─────────── */}
+      <div className="px-4 pt-2.5 pb-2 bg-gradient-to-b from-slate-50 to-white border-b border-slate-100 space-y-1.5">
+        <div className="flex items-start justify-between gap-2">
+          {/* Left: times */}
+          <div className="min-w-0">
+            <div className="text-[11px] text-slate-400 font-medium">{fmtDateUTC(match.match_date)}</div>
+            <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+              <span className="text-[12px] text-emerald-700 font-extrabold tabular-nums">
+                🕐 {israelTime(match.match_date)}
+              </span>
+              <span className="text-[10px] text-slate-500 font-medium">שעון ישראל</span>
+              <span className="text-[10px] text-slate-300">
+                ({israelDateShort(match.match_date)})
+              </span>
+            </div>
+          </div>
+          {/* Right: badges */}
+          <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
+            {match.group_name && (
+              <span className="text-[11px] bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-full">
+                בית {match.group_name}
+              </span>
+            )}
+            {(match.is_locked || isAutoLocked) && (
+              <span className="text-[11px] bg-amber-100 text-amber-600 font-semibold px-2 py-0.5 rounded-full">🔒</span>
+            )}
+            <StatusBadge status={match.status} />
+          </div>
+        </div>
+
+        {/* TV channels row */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-slate-300">📺</span>
+          {TV_CHANNELS.map(ch => (
+            <span
+              key={ch}
+              className="text-[10px] bg-sky-50 text-sky-600 font-semibold px-1.5 py-0.5 rounded-md border border-sky-100"
+            >
+              {ch}
             </span>
-          )}
-          {match.is_locked && (
-            <span className="text-[11px] bg-amber-100 text-amber-600 font-semibold px-2 py-0.5 rounded-full">🔒</span>
-          )}
-          <StatusBadge status={match.status} />
+          ))}
         </div>
       </div>
 
-      {/* Teams */}
+      {/* ── Feature 1: Countdown / auto-lock banners ─────── */}
+      {isCountdown && (
+        <div className="bg-amber-50 border-b border-amber-100 px-4 py-1.5 flex items-center gap-2">
+          <span className="text-amber-500 animate-pulse">⏰</span>
+          <span className="text-xs font-bold text-amber-700">
+            נסגר בעוד {minsToKick} {minsToKick === 1 ? 'דקה' : 'דקות'} — הזדרז לנחש!
+          </span>
+        </div>
+      )}
+      {isAutoLocked && (
+        <div className="bg-rose-50 border-b border-rose-100 px-4 py-1.5 flex items-center gap-2">
+          <span className="text-rose-500">🔒</span>
+          <span className="text-xs font-bold text-rose-700">
+            ההימור ננעל — המשחק מתחיל תוך כ-{minsToKick} {minsToKick === 1 ? 'דקה' : 'דקות'}
+          </span>
+        </div>
+      )}
+
+      {/* ── Teams ──────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-4 py-6 gap-2">
         <TeamBlock name={match.home_team} label="בית" />
 
-        {/* Centre */}
         <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
           {isFinished && match.home_score != null ? (
             <>
@@ -449,13 +515,18 @@ export default function MatchCard({ match, userBet, onBetPlaced }) {
         <TeamBlock name={match.away_team} label="אורח" />
       </div>
 
-      {/* Divider */}
-      <div className="mx-4 border-t border-slate-100" />
-
-      {/* Bet section */}
-      <div className="pt-3">
+      {/* ── Betting section ─────────────────────────────────── */}
+      <div className="border-t border-slate-100 pt-3">
         {renderBettingSection()}
       </div>
+
+      {/* ── Features 3 + 4: Community odds bar ──────────────── */}
+      {communityStats && (
+        <>
+          <div className="mx-4 border-t border-slate-100" />
+          <CommunityBar stats={communityStats} isLocked={isLocked || isFinished} />
+        </>
+      )}
     </div>
   )
 }

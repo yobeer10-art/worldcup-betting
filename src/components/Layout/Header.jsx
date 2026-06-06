@@ -7,6 +7,7 @@ const NAV = [
   { to: '/matches',     label: 'משחקים', icon: '⚽' },
   { to: '/groups',      label: 'בתים',   icon: '🏟️' },
   { to: '/bracket',     label: 'מדרגי',  icon: '🎯' },
+  { to: '/champion',    label: 'אלופה',  icon: '🥇', gold: true },
   { to: '/leaderboard', label: 'דירוג',  icon: '🏆' },
 ]
 
@@ -83,18 +84,22 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Nav tabs — 5 items, smaller text on mobile */}
+          {/* Nav tabs — 6 items, compact on mobile */}
           <nav className="flex">
-            {NAV.map(({ to, label, icon }) => {
+            {NAV.map(({ to, label, icon, gold }) => {
               const active = pathname === to
               return (
                 <Link
                   key={to}
                   to={to}
-                  className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-2 text-[11px] sm:text-sm font-semibold border-b-2 transition-all duration-200 ${
+                  className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-2 text-[10px] sm:text-sm font-semibold border-b-2 transition-all duration-200 ${
                     active
-                      ? 'text-white border-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]'
-                      : 'text-green-300/60 border-transparent hover:text-white hover:border-green-500/40'
+                      ? gold
+                        ? 'text-amber-300 border-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]'
+                        : 'text-white border-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]'
+                      : gold
+                        ? 'text-amber-400/70 border-transparent hover:text-amber-300 hover:border-amber-500/40'
+                        : 'text-green-300/60 border-transparent hover:text-white hover:border-green-500/40'
                   }`}
                 >
                   <span className={`text-base sm:text-sm ${active ? '' : 'opacity-70'}`}>{icon}</span>

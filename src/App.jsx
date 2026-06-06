@@ -8,6 +8,7 @@ import GroupsPage from './pages/GroupsPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import BracketPage from './pages/BracketPage'
 import AdminPage from './pages/AdminPage'
+import ChampionPage from './pages/ChampionPage'
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="/leaderboard" element={<LeaderboardPage />} />
               <Route path="/auth"       element={<AuthPage />}      />
               <Route path="/admin"      element={<AdminPage />}     />
+              <Route path="/champion"   element={<ChampionPage />}  />
               <Route path="*"           element={<HomePage />}      />
             </Routes>
           </div>

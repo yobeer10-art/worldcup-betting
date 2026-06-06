@@ -222,6 +222,77 @@ function BracketMatchRow({ match, onRefresh }) {
   )
 }
 
+/* ── Champion grading panel ─────────────────────────────────── */
+function ChampionGrader() {
+  const [team,    setTeam]    = useState('')
+  const [busy,    setBusy]    = useState(false)
+  const [msg,     setMsg]     = useState(null)
+  const [confirm, setConfirm] = useState(false)
+
+  async function grade() {
+    if (!team) return
+    setBusy(true); setMsg(null)
+    const { data, error } = await supabase.rpc('admin_grade_champion', { p_winning_team: team })
+    setBusy(false); setConfirm(false)
+    if (error) setMsg({ type: 'err', text: error.message })
+    else       setMsg({ type: 'ok',  text: `✅ ${data} ניחושים נכונים קיבלו 25 נקודות` })
+  }
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+      <h3 className="font-extrabold text-amber-800 flex items-center gap-2">
+        <span className="text-xl">🏆</span>
+        ניחוש האלופה — קביעת אלופה
+      </h3>
+      <p className="text-xs text-amber-700">
+        לאחר שהאלוף ידוע — הזן את שם הקבוצה (בדיוק כפי שהוא מופיע במערכת) וקבע נקודות.
+        פעולה זו ניתנת לביצוע פעם אחת בלבד לכל משתמש.
+      </p>
+      <input
+        value={team}
+        onChange={e => { setTeam(e.target.value); setConfirm(false); setMsg(null) }}
+        placeholder='שם הקבוצה, למשל "ברזיל"'
+        className="w-full text-sm border border-amber-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-amber-500"
+      />
+      {team && !confirm && (
+        <button
+          onClick={() => setConfirm(true)}
+          className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm py-2 rounded-xl transition-colors"
+        >
+          🏆 קבע {team} כאלופה
+        </button>
+      )}
+      {team && confirm && (
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-amber-900 text-center">
+            אישור: {team} היא אלופת מונדיאל 2026?
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={grade}
+              disabled={busy}
+              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-2 rounded-xl text-sm disabled:opacity-60"
+            >
+              {busy ? 'שומר...' : '✅ כן, קבע ונקד'}
+            </button>
+            <button
+              onClick={() => setConfirm(false)}
+              className="px-4 bg-white border border-amber-300 text-amber-700 font-semibold rounded-xl text-sm hover:bg-amber-50"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+      {msg && (
+        <p className={`text-sm font-medium ${msg.type === 'ok' ? 'text-emerald-600' : 'text-red-500'}`}>
+          {msg.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
 /* ── Main ──────────────────────────────────────────────────── */
 export default function AdminBracketManager() {
   const [matches, setMatches] = useState([])
@@ -244,6 +315,7 @@ export default function AdminBracketManager() {
 
   return (
     <div className="space-y-4">
+      <ChampionGrader />
       <AddMatchForm onAdded={load} />
 
       {/* Round filter */}

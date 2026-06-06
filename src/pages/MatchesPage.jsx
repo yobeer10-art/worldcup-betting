@@ -18,8 +18,9 @@ export default function MatchesPage() {
   const { user } = useAuth()
   const [matches, setMatches]   = useState([])
   const [userBets, setUserBets] = useState({})
-  const [loading, setLoading]   = useState(true)
-  const [filter, setFilter]     = useState('all')
+  const [loading, setLoading]       = useState(true)
+  const [filter, setFilter]         = useState('all')
+  const [communityStats, setCommunityStats] = useState({})
 
   // Self-reset state
   const canSelfReset = user && new Date() < SELF_RESET_DEADLINE
@@ -34,6 +35,12 @@ export default function MatchesPage() {
       .order('match_date', { ascending: true })
 
     setMatches(matchData ?? [])
+
+    // Community stats (bet_stats view)
+    const { data: statsData } = await supabase.from('bet_stats').select('*')
+    const statsMap = {}
+    statsData?.forEach(s => { statsMap[s.match_id] = s })
+    setCommunityStats(statsMap)
 
     if (user) {
       const { data: betsData } = await supabase
@@ -128,6 +135,7 @@ export default function MatchesPage() {
                 key={match.id}
                 match={match}
                 userBet={userBets[match.id]}
+                communityStats={communityStats[match.id] ?? null}
                 onBetPlaced={fetchData}
               />
             ))}
