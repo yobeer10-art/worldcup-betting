@@ -3,10 +3,9 @@ import { AuthProvider }    from './context/AuthContext'
 import { AdminProvider }   from './context/AdminContext'
 import AuthPage            from './pages/AuthPage'
 import HomePage            from './pages/HomePage'
-import MatchesPage         from './pages/MatchesPage'
-import ChampionPage        from './pages/ChampionPage'
+import DailyBetsPage       from './pages/DailyBetsPage'
+import SpecialPage         from './pages/SpecialPage'
 import BracketPage         from './pages/BracketPage'
-import TablesPage          from './pages/TablesPage'
 import LeaderboardPage     from './pages/LeaderboardPage'
 import AdminPage           from './pages/AdminPage'
 
@@ -18,21 +17,22 @@ export default function App() {
           <div className="min-h-screen bg-gray-50">
             <Routes>
               {/* ── Main routes ─────────────────────────── */}
-              <Route path="/"            element={<HomePage />}      />
-              <Route path="/matches"     element={<MatchesPage />}   />
-              <Route path="/champion"    element={<ChampionPage />}  />
-              <Route path="/bracket"     element={<BracketPage />}   />
-              <Route path="/tables"      element={<TablesPage />}    />
+              <Route path="/"            element={<HomePage />}        />
+              <Route path="/matches"     element={<DailyBetsPage />}   />
+              <Route path="/special"     element={<SpecialPage />}     />
+              <Route path="/bracket"     element={<BracketPage />}     />
               <Route path="/leaderboard" element={<LeaderboardPage />} />
-              <Route path="/auth"        element={<AuthPage />}      />
-              <Route path="/admin"       element={<AdminPage />}     />
+              <Route path="/auth"        element={<AuthPage />}        />
+              <Route path="/admin"       element={<AdminPage />}       />
 
-              {/* ── Legacy / old URLs ────────────────────── */}
-              <Route path="/groups"        element={<Navigate to="/tables"   replace />} />
-              <Route path="/pretournament" element={<Navigate to="/champion" replace />} />
+              {/* ── Legacy redirects ─────────────────────── */}
+              <Route path="/champion"      element={<Navigate to="/special"  replace />} />
+              <Route path="/pretournament" element={<Navigate to="/special"  replace />} />
+              <Route path="/tables"        element={<Navigate to="/"         replace />} />
+              <Route path="/groups"        element={<Navigate to="/"         replace />} />
 
               {/* ── Catch-all ───────────────────────────── */}
-              <Route path="*" element={<Navigate to="/matches" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </BrowserRouter>
