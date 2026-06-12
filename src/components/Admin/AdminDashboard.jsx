@@ -35,6 +35,14 @@ export default function AdminDashboard() {
   const [recalcMsg,  setRecalcMsg]  = useState(null)
   const [recalcing,  setRecalcing]  = useState(false)
 
+  // ── Special grading state ──────────────────────────────────────
+  const [champTeam,    setChampTeam]    = useState('')
+  const [champGrading, setChampGrading] = useState(false)
+  const [champGradeMsg,setChampGradeMsg]= useState(null)
+  const [scorerPlayer, setScorerPlayer] = useState('')
+  const [scorerGrading,setScorerGrading]= useState(false)
+  const [scorerGradeMsg,setScorerGradeMsg]=useState(null)
+
   useEffect(() => { loadDashboard() }, [])
 
   async function loadDashboard() {
@@ -89,6 +97,24 @@ export default function AdminDashboard() {
     loadDashboard()
   }
 
+  async function handleGradeChampion() {
+    if (!champTeam.trim()) return
+    setChampGrading(true); setChampGradeMsg(null)
+    const { data, error } = await supabase.rpc('admin_grade_champion', { p_team: champTeam.trim() })
+    if (error) setChampGradeMsg({ type: 'error', text: `שגיאה: ${error.message}` })
+    else       setChampGradeMsg({ type: 'ok',    text: `✅ ניחנו ${data} ניחושים · האלופה: ${champTeam.trim()}` })
+    setChampGrading(false)
+  }
+
+  async function handleGradeScorer() {
+    if (!scorerPlayer.trim()) return
+    setScorerGrading(true); setScorerGradeMsg(null)
+    const { data, error } = await supabase.rpc('admin_grade_top_scorer', { p_player: scorerPlayer.trim() })
+    if (error) setScorerGradeMsg({ type: 'error', text: `שגיאה: ${error.message}` })
+    else       setScorerGradeMsg({ type: 'ok',    text: `✅ ניחנו ${data} ניחושים · מלך שערים: ${scorerPlayer.trim()}` })
+    setScorerGrading(false)
+  }
+
   if (loading) return (
     <div className="flex justify-center py-16"><Spinner size="lg" /></div>
   )
@@ -125,6 +151,75 @@ export default function AdminDashboard() {
             {recalcMsg.text}
           </p>
         )}
+      </div>
+
+      {/* ── Special predictions grading ────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+        {/* Grade Champion */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+          <h2 className="font-bold text-slate-700 flex items-center gap-2">
+            <span>🥇</span> ניחון אלופה
+          </h2>
+          <p className="text-xs text-slate-400">הזן שם הקבוצה שזכתה — כל מי שניחש נכון יקבל 25 נק׳</p>
+          <input
+            type="text"
+            value={champTeam}
+            onChange={e => setChampTeam(e.target.value)}
+            placeholder="שם הקבוצה בעברית..."
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm
+                       focus:outline-none focus:border-amber-400"
+            dir="rtl"
+          />
+          <button
+            onClick={handleGradeChampion}
+            disabled={champGrading || !champTeam.trim()}
+            className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50
+                       text-white text-sm font-bold py-2 rounded-xl transition-colors"
+          >
+            {champGrading ? 'מניחן...' : '🏆 ניחן ותן נקודות'}
+          </button>
+          {champGradeMsg && (
+            <p className={`text-xs font-medium ${
+              champGradeMsg.type === 'ok' ? 'text-emerald-600' : 'text-red-500'
+            }`}>
+              {champGradeMsg.text}
+            </p>
+          )}
+        </div>
+
+        {/* Grade Top Scorer */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-3">
+          <h2 className="font-bold text-slate-700 flex items-center gap-2">
+            <span>⚽</span> ניחון מלך שערים
+          </h2>
+          <p className="text-xs text-slate-400">הזן שם השחקן — כל מי שניחש נכון יקבל 25 נק׳</p>
+          <input
+            type="text"
+            value={scorerPlayer}
+            onChange={e => setScorerPlayer(e.target.value)}
+            placeholder="שם השחקן בעברית..."
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm
+                       focus:outline-none focus:border-sky-400"
+            dir="rtl"
+          />
+          <button
+            onClick={handleGradeScorer}
+            disabled={scorerGrading || !scorerPlayer.trim()}
+            className="w-full bg-sky-500 hover:bg-sky-600 disabled:opacity-50
+                       text-white text-sm font-bold py-2 rounded-xl transition-colors"
+          >
+            {scorerGrading ? 'מניחן...' : '⚽ ניחן ותן נקודות'}
+          </button>
+          {scorerGradeMsg && (
+            <p className={`text-xs font-medium ${
+              scorerGradeMsg.type === 'ok' ? 'text-emerald-600' : 'text-red-500'
+            }`}>
+              {scorerGradeMsg.text}
+            </p>
+          )}
+        </div>
+
       </div>
 
       {/* ── Top matches by bet count ────────────────────────────── */}
