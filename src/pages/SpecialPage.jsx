@@ -5,7 +5,6 @@ import { supabase }          from '../lib/supabase'
 import { GROUPS, isPredictionLocked } from '../lib/groups'
 import { TOP_SCORERS }       from '../lib/players'
 import Header                from '../components/Layout/Header'
-import BottomNav             from '../components/Layout/BottomNav'
 import FlagImg               from '../components/UI/FlagImg'
 import Spinner               from '../components/UI/Spinner'
 
@@ -390,7 +389,6 @@ export default function SpecialPage() {
         )}
 
       </main>
-      <BottomNav />
     </>
   )
 }

@@ -112,7 +112,7 @@ export default function DailyBetsPage() {
   return (
     <>
       <Header />
-      <main className="max-w-lg mx-auto px-4 py-5">
+      <main className="max-w-lg mx-auto px-4 py-5 pb-24">
 
         {/* Date header */}
         <div className="mb-5">

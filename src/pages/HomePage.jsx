@@ -1,161 +1,257 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Layout/Header'
 import MatchCard from '../components/Matches/MatchCard'
+import FlagImg from '../components/UI/FlagImg'
 import Spinner from '../components/UI/Spinner'
 
-function StatBox({ value, label, highlight, icon }) {
-  return (
-    <div
-      className={`flex-1 rounded-xl px-3 py-2.5 text-center transition-transform hover:scale-105 ${
-        highlight
-          ? 'bg-white/25 ring-1 ring-white/30'
-          : 'bg-white/15'
-      }`}
-    >
-      {icon && <div className="text-lg mb-0.5">{icon}</div>}
-      <div
-        className={`text-2xl font-extrabold tabular-nums leading-none ${
-          highlight ? 'text-yellow-300' : 'text-white'
-        }`}
-      >
-        {value}
-      </div>
-      <div className="text-xs text-green-100/80 mt-1">{label}</div>
-    </div>
-  )
+/* ── Date helpers (Israel time) ──────────────────────────────── */
+function israelToday() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+}
+function israelDayRange(d) {
+  return {
+    start: new Date(`${d}T00:00:00+03:00`),
+    end:   new Date(`${d}T23:59:59+03:00`),
+  }
+}
+function hebrewDateShort(dateStr) {
+  return new Date(`${dateStr}T12:00:00+03:00`).toLocaleDateString('he-IL', {
+    timeZone: 'Asia/Jerusalem', day: 'numeric', month: 'long', weekday: 'short',
+  })
 }
 
+/* ════════════════════════════════════════════════════════════════ */
 export default function HomePage() {
   const { user, profile } = useAuth()
-  const [upcomingMatches, setUpcomingMatches] = useState([])
-  const [userBets, setUserBets] = useState({})
-  const [stats, setStats] = useState({ totalUsers: 0, totalBets: 0 })
-  const [loading, setLoading] = useState(true)
 
-  async function fetchData() {
-    const [matchesRes, usersRes, betsRes] = await Promise.all([
-      supabase
-        .from('matches')
-        .select('*')
-        .eq('status', 'upcoming')
-        .gte('match_date', new Date().toISOString())
-        .order('match_date', { ascending: true })
-        .limit(3),
-      supabase.from('users').select('id', { count: 'exact', head: true }),
-      supabase.from('bets').select('id', { count: 'exact', head: true }),
-    ])
+  const [matches,    setMatches]    = useState([])
+  const [userBets,   setUserBets]   = useState({})
+  const [stats,      setStats]      = useState({})
+  const [rank,       setRank]       = useState(null)
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [champion,   setChampion]   = useState(null)
+  const [scorer,     setScorer]     = useState(null)
+  const [dateStr,    setDateStr]    = useState(israelToday)
+  const [isNext,     setIsNext]     = useState(false)
+  const [loading,    setLoading]    = useState(true)
 
-    setUpcomingMatches(matchesRes.data ?? [])
-    setStats({ totalUsers: usersRes.count ?? 0, totalBets: betsRes.count ?? 0 })
+  const fetchAll = useCallback(async () => {
+    const today = israelToday()
+    const { start, end } = israelDayRange(today)
 
-    if (user) {
-      const { data: myBets } = await supabase
-        .from('bets')
-        .select('*')
-        .eq('user_id', user.id)
-      const map = {}
-      myBets?.forEach((b) => { map[b.match_id] = b })
-      setUserBets(map)
+    // ── Today's matches ─────────────────────────────────────────
+    let { data: dayMatches } = await supabase
+      .from('matches').select('*')
+      .gte('match_date', start.toISOString())
+      .lte('match_date', end.toISOString())
+      .order('match_date')
+
+    let usedDate = today
+    let next = false
+
+    if (!dayMatches?.length) {
+      const { data: up } = await supabase
+        .from('matches').select('match_date')
+        .gt('match_date', end.toISOString())
+        .order('match_date').limit(1)
+
+      if (up?.length) {
+        usedDate = new Date(up[0].match_date)
+          .toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+        const { start: ns, end: ne } = israelDayRange(usedDate)
+        const { data: nm } = await supabase
+          .from('matches').select('*')
+          .gte('match_date', ns.toISOString())
+          .lte('match_date', ne.toISOString())
+          .order('match_date')
+        dayMatches = nm ?? []
+        next = true
+      }
     }
+
+    setMatches(dayMatches ?? [])
+    setDateStr(usedDate)
+    setIsNext(next)
+
+    // ── Parallel fetches ─────────────────────────────────────────
+    const ids = (dayMatches ?? []).map(m => m.id)
+    const [statsRes, totalRes, betsRes, rankRes, champRes, scorerRes] =
+      await Promise.all([
+        ids.length
+          ? supabase.from('bet_stats').select('*').in('match_id', ids)
+          : Promise.resolve({ data: [] }),
+        supabase.from('users').select('id', { count: 'exact', head: true }),
+        user && ids.length
+          ? supabase.from('bets').select('*').eq('user_id', user.id).in('match_id', ids)
+          : Promise.resolve({ data: [] }),
+        user
+          ? supabase.from('users').select('id', { count: 'exact', head: true })
+              .gt('total_points', profile?.total_points ?? -1)
+          : Promise.resolve({ count: null }),
+        user
+          ? supabase.from('champion_predictions').select('team')
+              .eq('user_id', user.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        user
+          ? supabase.from('top_scorer_predictions').select('player_name')
+              .eq('user_id', user.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ])
+
+    const sm = {}
+    statsRes.data?.forEach(s => { sm[s.match_id] = s })
+    setStats(sm)
+
+    setTotalUsers(totalRes.count ?? 0)
+
+    const bm = {}
+    betsRes.data?.forEach(b => { bm[b.match_id] = b })
+    setUserBets(bm)
+
+    if (rankRes.count != null) setRank(rankRes.count + 1)
+    setChampion(champRes.data?.team ?? null)
+    setScorer(scorerRes.data?.player_name ?? null)
+
     setLoading(false)
-  }
+  }, [user, profile?.total_points])
 
-  useEffect(() => { fetchData() }, [user]) // eslint-disable-line
+  useEffect(() => { fetchAll() }, [fetchAll])
 
+  /* ── Render ──────────────────────────────────────────────────── */
   return (
     <>
       <Header />
-      <main className="max-w-lg mx-auto px-4 py-5">
+      <main className="max-w-lg mx-auto px-4 py-5 pb-24 space-y-6">
 
-        {/* ── Hero banner ───────────────────────────────── */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-green-800 via-green-700 to-emerald-600 rounded-3xl p-5 mb-6 shadow-xl">
-          {/* Decorative background circles */}
-          <div className="absolute -top-8 -start-8 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
-          <div className="absolute -bottom-10 -end-6 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-          <div className="absolute top-3 end-3 text-6xl opacity-20 pointer-events-none select-none">
-            🏆
-          </div>
-
-          <div className="relative">
-            <div className="flex items-start gap-3 mb-4">
-              <div>
-                <h1 className="text-2xl font-extrabold text-white leading-tight">
-                  מונדיאל 2026 ⚽
-                </h1>
-                <p className="text-green-200 text-sm mt-0.5">
-                  נחש תוצאות, צבור נקודות, עלה לראש הטבלה
-                </p>
+        {/* ── Hero / stats ───────────────────────────────────── */}
+        {user ? (
+          <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600
+                          rounded-2xl p-5 text-white shadow-md">
+            <p className="text-emerald-100 text-sm mb-3">
+              שלום, <span className="font-bold">{profile?.display_name || 'שחקן'}</span> 👋
+            </p>
+            <div className="flex items-end gap-4">
+              <div className="flex-1">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-extrabold tabular-nums leading-none">
+                    {profile?.total_points ?? 0}
+                  </span>
+                  <span className="text-emerald-200 text-base">נקודות</span>
+                </div>
               </div>
+              {rank && (
+                <div className="text-right">
+                  <div className="text-2xl font-extrabold">#{rank}</div>
+                  <p className="text-emerald-200 text-xs">מתוך {totalUsers} שחקנים</p>
+                </div>
+              )}
             </div>
-
-            <div className="flex gap-2.5">
-              <StatBox value={stats.totalUsers} label="משתתפים" icon="👥" />
-              <StatBox value={stats.totalBets} label="ניחושים" icon="🎯" />
-              <StatBox
-                value={user && profile ? profile.total_points : '—'}
-                label="הנקודות שלי"
-                icon="⭐"
-                highlight={!!user}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* ── Guest CTA ─────────────────────────────────── */}
-        {!user && (
-          <div className="flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 mb-6 shadow-sm">
-            <div>
-              <p className="text-amber-900 font-semibold text-sm">הצטרף בחינם 🎉</p>
-              <p className="text-amber-700 text-xs mt-0.5">
-                הירשם ותתחיל לנחש תוצאות מונדיאל
-              </p>
-            </div>
-            <Link
-              to="/auth"
-              className="shrink-0 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-green-700 active:scale-95 transition-all shadow"
-            >
-              הרשמה
-            </Link>
-          </div>
-        )}
-
-        {/* ── Upcoming matches ──────────────────────────── */}
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-bold text-slate-800">משחקים קרובים</h2>
-          <Link
-            to="/matches"
-            className="text-sm text-emerald-600 font-semibold hover:text-emerald-700 flex items-center gap-1"
-          >
-            כל המשחקים
-            <span className="text-base">←</span>
-          </Link>
-        </div>
-
-        {loading ? (
-          <Spinner />
-        ) : upcomingMatches.length === 0 ? (
-          <div className="text-center py-14 text-slate-400">
-            <div className="text-5xl mb-3">📅</div>
-            <p className="font-medium">אין משחקים קרובים</p>
-            <Link to="/matches" className="text-emerald-600 text-sm mt-2 block hover:underline">
-              צפה בכל המשחקים
-            </Link>
           </div>
         ) : (
-          <div className="space-y-4">
-            {upcomingMatches.map((match) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                userBet={userBets[match.id]}
-                onBetPlaced={fetchData}
-              />
-            ))}
+          <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600
+                          rounded-2xl p-5 text-white shadow-md">
+            <div className="text-2xl font-extrabold mb-1">ברוכים הבאים! ⚽</div>
+            <p className="text-emerald-100 text-sm mb-4">
+              נחש תוצאות, בחר אלופה ומלך שערים — עלה בדירוג
+            </p>
+            <Link
+              to="/auth"
+              className="inline-block bg-white text-emerald-700 px-5 py-2.5 rounded-xl
+                         font-bold text-sm hover:bg-emerald-50 transition-colors shadow-sm"
+            >
+              הצטרף בחינם
+            </Link>
           </div>
         )}
+
+        {/* ── Today's / next matches ──────────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-extrabold text-slate-800">
+              {isNext ? '⚽ משחקים קרובים' : `⚽ משחקי היום · ${hebrewDateShort(dateStr)}`}
+            </h2>
+            <Link to="/matches" className="text-xs text-emerald-600 font-semibold hover:underline">
+              כל המשחקים ←
+            </Link>
+          </div>
+
+          {loading ? (
+            <Spinner size="sm" />
+          ) : matches.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center">
+              <div className="text-3xl mb-2">🏆</div>
+              <p className="text-slate-500 text-sm font-medium">אין משחקים בתקופה הקרובה</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {matches.map(m => (
+                <MatchCard
+                  key={m.id}
+                  match={m}
+                  userBet={userBets[m.id] ?? null}
+                  communityStats={stats[m.id] ?? null}
+                  onBetPlaced={fetchAll}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── Special bets quick status ───────────────────────── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-extrabold text-slate-800">🏆 ניחושים מיוחדים</h2>
+            <Link to="/special" className="text-xs text-emerald-600 font-semibold hover:underline">
+              ערוך ←
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+
+            {/* Champion card */}
+            <Link
+              to="/special?t=champion"
+              className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm
+                         hover:border-amber-300 hover:shadow-md transition-all group"
+            >
+              <p className="text-[10px] text-slate-400 font-semibold mb-2 uppercase tracking-wide">
+                🥇 אלופה · 25 נק׳
+              </p>
+              {champion ? (
+                <div className="flex items-center gap-2">
+                  <FlagImg team={champion} size="sm" className="shrink-0" />
+                  <span className="text-sm font-bold text-slate-800 truncate">{champion}</span>
+                </div>
+              ) : (
+                <p className="text-sm text-amber-600 font-bold group-hover:text-amber-700">
+                  לחץ לבחור →
+                </p>
+              )}
+            </Link>
+
+            {/* Top scorer card */}
+            <Link
+              to="/special?t=scorer"
+              className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm
+                         hover:border-sky-300 hover:shadow-md transition-all group"
+            >
+              <p className="text-[10px] text-slate-400 font-semibold mb-2 uppercase tracking-wide">
+                ⚽ מלך שערים · 25 נק׳
+              </p>
+              {scorer ? (
+                <span className="text-sm font-bold text-slate-800 leading-snug">{scorer}</span>
+              ) : (
+                <p className="text-sm text-sky-600 font-bold group-hover:text-sky-700">
+                  לחץ לבחור →
+                </p>
+              )}
+            </Link>
+
+          </div>
+        </section>
+
       </main>
     </>
   )

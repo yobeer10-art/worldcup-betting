@@ -29,7 +29,7 @@ export default function LeaderboardPage() {
   return (
     <>
       <Header />
-      <main className="max-w-lg mx-auto px-4 py-5">
+      <main className="max-w-lg mx-auto px-4 py-5 pb-24">
 
         {/* ── Hero trophy banner ───────────────────────── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-amber-400 via-yellow-400 to-orange-400 rounded-3xl p-5 mb-5 shadow-xl text-white">

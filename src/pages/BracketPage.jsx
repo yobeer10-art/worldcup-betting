@@ -159,7 +159,7 @@ export default function BracketPage() {
   return (
     <>
       <Header />
-      <main className="max-w-5xl mx-auto px-4 py-5 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-6">
 
         {/* Page title */}
         <div className="flex items-center gap-3">
