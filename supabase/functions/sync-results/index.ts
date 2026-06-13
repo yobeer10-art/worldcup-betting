@@ -7,48 +7,117 @@
 //   FOOTBALL_DATA_API_KEY  — free key: https://www.football-data.org/
 //   SUPABASE_URL           — auto-injected
 //   SUPABASE_SERVICE_ROLE_KEY — auto-injected
+//
+// Deploy:  supabase functions deploy sync-results
+// Trigger: curl -X POST https://<ref>.supabase.co/functions/v1/sync-results \
+//            -H "Authorization: Bearer <anon_key>"
 // ================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// ── English API names → Hebrew ────────────────────────────────
+// ── English API names → Hebrew ────────────────────────────────────
+// Covers all 48 WC 2026 teams + common API spelling variants.
 const TEAM_MAP: Record<string, string> = {
-  'Mexico': 'מקסיקו', 'Canada': 'קנדה',
-  'United States': 'ארצות הברית', 'USA': 'ארצות הברית',
-  'Panama': 'פנמה', 'Haiti': 'האיטי',
-  'Curaçao': 'קוראסאו', 'Curacao': 'קוראסאו',
-  'Brazil': 'ברזיל', 'Argentina': 'ארגנטינה',
-  'Uruguay': 'אורוגוואי', 'Colombia': 'קולומביה',
-  'Ecuador': 'אקוודור', 'Paraguay': 'פרגוואי',
-  'Germany': 'גרמניה', 'France': 'צרפת', 'Spain': 'ספרד',
-  'England': 'אנגליה', 'Portugal': 'פורטוגל',
-  'Netherlands': 'הולנד', 'Belgium': 'בלגיה',
-  'Switzerland': 'שוויץ', 'Croatia': 'קרואטיה',
-  'Austria': 'אוסטריה', 'Czechia': "צ'כיה",
-  'Czech Republic': "צ'כיה", 'Scotland': 'סקוטלנד',
-  'Turkey': 'טורקיה', 'Türkiye': 'טורקיה',
-  'Norway': 'נורווגיה', 'Sweden': 'שוודיה',
+  // CONCACAF
+  'Mexico':                'מקסיקו',
+  'Canada':                'קנדה',
+  'United States':         'ארצות הברית',
+  'USA':                   'ארצות הברית',
+  'US':                    'ארצות הברית',
+  'United States of America': 'ארצות הברית',
+  'Panama':                'פנמה',
+  'Haiti':                 'האיטי',
+  'Jamaica':               "ג'מייקה",
+  'Honduras':              'הונדורס',
+  'Costa Rica':            'קוסטה ריקה',
+  'Curaçao':               'קוראסאו',
+  'Curacao':               'קוראסאו',
+  // CONMEBOL
+  'Brazil':                'ברזיל',
+  'Argentina':             'ארגנטינה',
+  'Uruguay':               'אורוגוואי',
+  'Colombia':              'קולומביה',
+  'Ecuador':               'אקוודור',
+  'Paraguay':              'פרגוואי',
+  'Bolivia':               'בוליביה',
+  'Peru':                  'פרו',
+  'Chile':                 "צ'ילה",
+  'Venezuela':             'ונצואלה',
+  // UEFA
+  'Germany':               'גרמניה',
+  'France':                'צרפת',
+  'Spain':                 'ספרד',
+  'England':               'אנגליה',
+  'Portugal':              'פורטוגל',
+  'Netherlands':           'הולנד',
+  'Belgium':               'בלגיה',
+  'Switzerland':           'שוויץ',
+  'Croatia':               'קרואטיה',
+  'Austria':               'אוסטריה',
+  'Czechia':               "צ'כיה",
+  'Czech Republic':        "צ'כיה",
+  'Scotland':              'סקוטלנד',
+  'Wales':                 'ויילס',
+  'Ireland':               'אירלנד',
+  'Republic of Ireland':   'אירלנד',
+  'Turkey':                'טורקיה',
+  'Türkiye':               'טורקיה',
+  'Norway':                'נורווגיה',
+  'Sweden':                'שוודיה',
+  'Denmark':               'דנמרק',
+  'Poland':                'פולין',
+  'Serbia':                'סרביה',
+  'Slovenia':              'סלובניה',
+  'Slovakia':              'סלובקיה',
+  'Hungary':               'הונגריה',
+  'Romania':               'רומניה',
+  'Greece':                'יוון',
+  'Ukraine':               'אוקראינה',
+  'Georgia':               "ג'ורג'יה",
   'Bosnia and Herzegovina': 'בוסניה והרצגובינה',
-  'Bosnia & Herzegovina': 'בוסניה והרצגובינה',
-  'Morocco': 'מרוקו', 'Senegal': 'סנגל',
-  'Ghana': 'גאנה', 'Egypt': 'מצרים',
-  'Tunisia': 'תוניסיה', 'Algeria': "אלג'יריה",
-  'South Africa': 'דרום אפריקה',
-  "Côte d'Ivoire": 'חוף השנהב', "Cote d'Ivoire": 'חוף השנהב',
-  'Ivory Coast': 'חוף השנהב',
-  'DR Congo': 'קונגו הדמוקרטית',
-  'Congo DR': 'קונגו הדמוקרטית',
+  'Bosnia & Herzegovina':  'בוסניה והרצגובינה',
+  'Bosnia-Herzegovina':    'בוסניה והרצגובינה',
+  'Italy':                 'איטליה',
+  'Israel':                'ישראל',
+  // CAF
+  'Morocco':               'מרוקו',
+  'Senegal':               'סנגל',
+  'Nigeria':               'ניגריה',
+  'Cameroon':              'קמרון',
+  'Ghana':                 'גאנה',
+  'Egypt':                 'מצרים',
+  'Tunisia':               'תוניסיה',
+  'Algeria':               "אלג'יריה",
+  'Mali':                  'מאלי',
+  'South Africa':          'דרום אפריקה',
+  "Côte d'Ivoire":         'חוף השנהב',
+  "Cote d'Ivoire":         'חוף השנהב',
+  'Ivory Coast':           'חוף השנהב',
+  'DR Congo':              'קונגו הדמוקרטית',
+  'Congo DR':              'קונגו הדמוקרטית',
   'Democratic Republic of Congo': 'קונגו הדמוקרטית',
   'Democratic Republic of the Congo': 'קונגו הדמוקרטית',
-  'Cape Verde': 'כף ורדה', 'Cabo Verde': 'כף ורדה',
-  'Japan': 'יפן',
-  'South Korea': 'קוריאה הדרומית',
-  'Korea Republic': 'קוריאה הדרומית',
-  'Republic of Korea': 'קוריאה הדרומית',
-  'Australia': 'אוסטרליה', 'Saudi Arabia': 'סעודיה',
-  'Iran': 'איראן', 'Qatar': 'קטר',
-  'Iraq': 'עיראק', 'Jordan': 'ירדן',
-  'Uzbekistan': 'אוזבקיסטן', 'New Zealand': 'ניו זילנד',
+  'Cape Verde':            'כף ורדה',
+  'Cabo Verde':            'כף ורדה',
+  'Ethiopia':              'אתיופיה',
+  // AFC
+  'Japan':                 'יפן',
+  'South Korea':           'קוריאה הדרומית',
+  'Korea Republic':        'קוריאה הדרומית',
+  'Republic of Korea':     'קוריאה הדרומית',
+  'Korea DPR':             'קוריאה הדרומית',  // fallback
+  'Australia':             'אוסטרליה',
+  'Saudi Arabia':          'סעודיה',
+  'KSA':                   'סעודיה',
+  'Iran':                  'איראן',
+  'IR Iran':               'איראן',
+  'Qatar':                 'קטר',
+  'Iraq':                  'עיראק',
+  'Jordan':                'ירדן',
+  'Uzbekistan':            'אוזבקיסטן',
+  'Kuwait':                'כווית',
+  // OFC
+  'New Zealand':           'ניו זילנד',
 }
 
 function mapTeam(name: string): string | null {
@@ -59,8 +128,8 @@ interface ApiMatch {
   id:       number
   utcDate:  string
   status:   string
-  homeTeam: { name: string }
-  awayTeam: { name: string }
+  homeTeam: { name: string; shortName?: string }
+  awayTeam: { name: string; shortName?: string }
   score: {
     winner:   'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null
     fullTime: { home: number | null; away: number | null }
@@ -82,7 +151,11 @@ Deno.serve(async () => {
   }
 
   let updatedCount = 0
+  let skippedCount = 0
+  let unmappedTeams: string[] = []
+  let notFoundMatches: string[] = []
   let errorMsg: string | null = null
+  const log: string[] = []
 
   try {
     const apiRes = await fetch(
@@ -94,38 +167,70 @@ Deno.serve(async () => {
     }
 
     const { matches }: { matches: ApiMatch[] } = await apiRes.json()
+    log.push(`API returned ${matches.length} finished matches`)
 
     for (const m of matches) {
-      const homeHe = mapTeam(m.homeTeam.name)
-      const awayHe = mapTeam(m.awayTeam.name)
+      const homeRaw = m.homeTeam.name
+      const awayRaw = m.awayTeam.name
+      const homeHe  = mapTeam(homeRaw)
+      const awayHe  = mapTeam(awayRaw)
+
+      if (!homeHe) {
+        unmappedTeams.push(homeRaw)
+        console.warn(`[sync] unmapped home team: "${homeRaw}"`)
+      }
+      if (!awayHe) {
+        unmappedTeams.push(awayRaw)
+        console.warn(`[sync] unmapped away team: "${awayRaw}"`)
+      }
       if (!homeHe || !awayHe) continue
 
       let result: 'home' | 'draw' | 'away' | null = null
       if (m.score.winner === 'HOME_TEAM') result = 'home'
       else if (m.score.winner === 'AWAY_TEAM') result = 'away'
       else if (m.score.winner === 'DRAW')      result = 'draw'
-      if (!result) continue
+      if (!result) {
+        log.push(`  SKIP ${homeHe} vs ${awayHe}: no winner yet`)
+        continue
+      }
 
       const homeScore = m.score.fullTime.home
       const awayScore = m.score.fullTime.away
 
-      // Find our match row (±12h window around API timestamp)
+      // ── Find DB match: primary = team names, secondary = ±24h date window ──
       const apiDate = new Date(m.utcDate)
-      const dateMin = new Date(apiDate.getTime() - 12 * 3600000).toISOString()
-      const dateMax = new Date(apiDate.getTime() + 12 * 3600000).toISOString()
+      const dateMin = new Date(apiDate.getTime() - 24 * 3600000).toISOString()
+      const dateMax = new Date(apiDate.getTime() + 24 * 3600000).toISOString()
 
-      const { data: dbMatch } = await supabase
+      const { data: dbMatch, error: findErr } = await supabase
         .from('matches')
-        .select('id, status')
+        .select('id, status, home_team, away_team')
         .eq('home_team', homeHe)
         .eq('away_team', awayHe)
         .gte('match_date', dateMin)
         .lte('match_date', dateMax)
         .maybeSingle()
 
-      if (!dbMatch || dbMatch.status === 'finished') continue
+      if (findErr) {
+        console.error(`[sync] DB lookup error for ${homeHe} vs ${awayHe}:`, findErr)
+        continue
+      }
 
-      // ── Update match ──────────────────────────────────────────
+      if (!dbMatch) {
+        notFoundMatches.push(`${homeHe} vs ${awayHe} (${m.utcDate})`)
+        console.warn(`[sync] DB match NOT FOUND: ${homeHe} vs ${awayHe} around ${m.utcDate}`)
+        continue
+      }
+
+      if (dbMatch.status === 'finished') {
+        log.push(`  SKIP ${homeHe} vs ${awayHe}: already finished in DB`)
+        skippedCount++
+        continue
+      }
+
+      log.push(`  UPDATE ${homeHe} vs ${awayHe}: ${homeScore}–${awayScore} (${result})`)
+
+      // ── Update match ───────────────────────────────────────────────
       const { error: matchErr } = await supabase
         .from('matches')
         .update({
@@ -137,21 +242,20 @@ Deno.serve(async () => {
         })
         .eq('id', dbMatch.id)
 
-      if (matchErr) { console.error('match update:', matchErr); continue }
+      if (matchErr) {
+        console.error(`[sync] match update error:`, matchErr)
+        continue
+      }
 
-      // ── Grade bets: 3-tier scoring ─────────────────────────────
-      // Correct result AND correct exact score → 3 pts
-      // Correct result, wrong/no score         → 1 pt
-      // Wrong result                           → 0 pts
-
-      // Wrong predictions
+      // ── Grade bets: 3-tier scoring ─────────────────────────────────
+      // Wrong result → 0 pts
       await supabase
         .from('bets')
         .update({ is_correct: false, points_earned: 0 })
         .eq('match_id', dbMatch.id)
         .neq('prediction', result)
 
-      // Correct predictions — need to check score individually
+      // Correct result — check score individually for bonus
       const { data: correctBets } = await supabase
         .from('bets')
         .select('id, predicted_home_score, predicted_away_score')
@@ -172,30 +276,51 @@ Deno.serve(async () => {
             points_earned: exactMatch ? 3 : 1,
           })
           .eq('id', bet.id)
-        // on_bet_graded trigger fires and recalculates user total_points
+        // on_bet_graded trigger recalculates user total_points
       }
 
       updatedCount++
     }
+
+    // Deduplicate unmapped teams
+    unmappedTeams = [...new Set(unmappedTeams)]
+
+    log.push(`Done: ${updatedCount} updated, ${skippedCount} already finished`)
+    if (unmappedTeams.length)   log.push(`Unmapped teams: ${unmappedTeams.join(', ')}`)
+    if (notFoundMatches.length) log.push(`Not found in DB: ${notFoundMatches.join(' | ')}`)
+
+    console.log('[sync]', log.join('\n'))
+
   } catch (err) {
     errorMsg = err instanceof Error ? err.message : String(err)
-    console.error('sync-results error:', errorMsg)
+    console.error('[sync] fatal error:', errorMsg)
   }
 
-  // Log to sync_log
-  await supabase
-    .from('sync_log')
-    .insert({ matches_updated: updatedCount, status: errorMsg ? 'error' : 'success', message: errorMsg })
-    .catch(() => {})
+  // Log to sync_log (fire-and-forget)
+  try {
+    await supabase.from('sync_log').insert({
+      matches_updated: updatedCount,
+      status:  errorMsg ? 'error' : 'success',
+      message: errorMsg
+        ?? (notFoundMatches.length
+          ? `Not found in DB: ${notFoundMatches.join(' | ')}`
+          : log.at(-1) ?? null),
+    })
+  } catch (_) { /* ignore logging failures */ }
 
-  if (errorMsg) {
-    return new Response(
-      JSON.stringify({ success: false, error: errorMsg }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    )
-  }
-  return new Response(
-    JSON.stringify({ success: true, updated: updatedCount }),
-    { headers: { 'Content-Type': 'application/json' } },
-  )
+  const body = errorMsg
+    ? { success: false, error: errorMsg }
+    : {
+        success: true,
+        updated: updatedCount,
+        skipped: skippedCount,
+        unmappedTeams,
+        notFoundMatches,
+        log,
+      }
+
+  return new Response(JSON.stringify(body, null, 2), {
+    status: errorMsg ? 500 : 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
 })

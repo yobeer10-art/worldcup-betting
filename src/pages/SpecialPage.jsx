@@ -46,20 +46,18 @@ function CommunityBar({ picks, valueKey, renderLabel }) {
 }
 
 // ── Section wrapper ────────────────────────────────────────────────
-function Section({ icon, title, points, locked, children }) {
+function Section({ title, points, locked, children }) {
   return (
     <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-5 pt-5 pb-4 border-b border-slate-100">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">{icon}</span>
-            <div>
-              <h2 className="font-extrabold text-slate-800 leading-tight">{title}</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{points} נקודות לניחוש נכון</p>
-            </div>
+      <div className="px-5 pt-4 pb-3 border-b border-slate-100">
+        <div className="flex items-start justify-between gap-2">
+          {/* Title — min-w-0 prevents flex from squishing */}
+          <div className="min-w-0">
+            <h2 className="font-extrabold text-slate-800 text-base leading-snug">{title}</h2>
+            <p className="text-xs text-slate-400 mt-0.5">{points} נקודות לניחוש נכון</p>
           </div>
-          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border shrink-0 ${
+          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full border shrink-0 mt-0.5 ${
             locked
               ? 'bg-rose-50 border-rose-200 text-rose-600'
               : 'bg-emerald-50 border-emerald-200 text-emerald-600'
@@ -195,7 +193,7 @@ export default function SpecialPage() {
             {/* ══════════════════════════════════════════════════════
                 SECTION 1 — CHAMPION
             ══════════════════════════════════════════════════════ */}
-            <Section icon="🥇" title="מי תיקח את הגביע?" points={25} locked={locked}>
+            <Section title="🏆 מי תיקח את הגביע?" points={25} locked={locked}>
 
               {/* Current pick */}
               {myChampion?.team && (
@@ -274,7 +272,7 @@ export default function SpecialPage() {
             {/* ══════════════════════════════════════════════════════
                 SECTION 2 — TOP SCORER
             ══════════════════════════════════════════════════════ */}
-            <Section icon="⚽" title="מי מלך השערים?" points={25} locked={locked}>
+            <Section title="⚽ מי יהיה מלך השערים?" points={25} locked={locked}>
 
               {/* Current pick */}
               {myScorer?.player_name && (
