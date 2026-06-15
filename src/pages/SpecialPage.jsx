@@ -170,7 +170,7 @@ export default function SpecialPage() {
         <div>
           <h1 className="text-xl font-extrabold text-slate-800">🏆 ניחושים מיוחדים</h1>
           <p className="text-slate-400 text-xs mt-0.5">
-            25 נקודות לכל ניחוש נכון · נעול עם תחילת הטורניר (11.6.2026)
+            25 נקודות לכל ניחוש נכון · ניתן לשנות עד 20.6.2026 23:59
           </p>
         </div>
 

@@ -18,7 +18,7 @@ export const GROUPS = [
 ]
 
 // Predictions lock when the tournament kicks off
-export const PREDICTION_DEADLINE = new Date('2026-06-11T00:00:00Z')
+export const PREDICTION_DEADLINE = new Date('2026-06-20T20:59:00Z') // June 20 23:59 Israel (UTC+3)
 
 export function isPredictionLocked() {
   return new Date() >= PREDICTION_DEADLINE

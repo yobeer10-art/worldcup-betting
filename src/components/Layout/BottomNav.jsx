@@ -5,6 +5,7 @@ import { useAdmin } from '../../context/AdminContext'
 const TABS = [
   { to: '/',            icon: '🏠', label: 'בית'               },
   { to: '/matches',     icon: '⚽', label: 'משחקי היום להימור' },
+  { to: '/mybets',      icon: '📋', label: 'ההימורים שלי'      },
   { to: '/special',     icon: '🏆', label: 'ניחושים'           },
   { to: '/leaderboard', icon: '📊', label: 'דירוג'             },
 ]
