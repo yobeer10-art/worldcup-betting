@@ -10,6 +10,7 @@ import BracketPage         from './pages/BracketPage'
 import LeaderboardPage     from './pages/LeaderboardPage'
 import AdminPage           from './pages/AdminPage'
 import MyBetsPage         from './pages/MyBetsPage'
+import DigestPage         from './pages/DigestPage'
 
 /** Renders BottomNav on every route except /auth and /admin */
 function GlobalNav() {
@@ -34,6 +35,7 @@ export default function App() {
               <Route path="/auth"        element={<AuthPage />}        />
               <Route path="/admin"       element={<AdminPage />}       />
               <Route path="/mybets"     element={<MyBetsPage />}     />
+              <Route path="/digest"     element={<DigestPage />}     />
 
               {/* ── Legacy redirects ─────────────────────── */}
               <Route path="/champion"      element={<Navigate to="/special" replace />} />
