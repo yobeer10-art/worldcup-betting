@@ -60,11 +60,11 @@ function TodayMatchesReminder() {
 
   const buildText = useCallback((matches) => {
     if (matches.length === 0) {
-      return '🌍 מונדיאל 2026\n\nאין משחקים היום. נתראה מחר! ⚽'
+      return '🌍 מונדיאל 2026\n\nאין עוד משחקים היום 🌙\nנתראה מחר! ⚽'
     }
 
     const lines = [
-      '🔥 *מונדיאל 2026 – משחקי היום!* 🔥',
+      '🔥 *מונדיאל 2026 – המשחקים הקרובים היום!* 🔥',
       '',
     ]
 
@@ -88,15 +88,15 @@ function TodayMatchesReminder() {
 
   async function generate() {
     setLoading(true)
-    const today = israelToday()
-    const startUTC = new Date(`${today}T00:00:00+03:00`).toISOString()
-    const endUTC   = new Date(`${today}T23:59:59+03:00`).toISOString()
+    const today  = israelToday()
+    const nowUTC = new Date().toISOString()                          // current moment — excludes already-started matches
+    const endUTC = new Date(`${today}T23:59:59+03:00`).toISOString() // end of today in Israel time
 
     const { data } = await supabase
       .from('matches')
       .select('home_team, away_team, match_date, broadcast')
-      .gte('match_date', startUTC)
-      .lte('match_date', endUTC)
+      .gt('match_date', nowUTC)   // strictly after now → upcoming only
+      .lte('match_date', endUTC)  // still within today (Israel)
       .order('match_date')
 
     const result = buildText(data ?? [])
