@@ -117,8 +117,8 @@ export default function MyBetsPage() {
         user_id:              user.id,
         match_id:             matchId,
         prediction:           pred,
-        predicted_home_score: homeScore !== '' ? parseInt(homeScore, 10) : null,
-        predicted_away_score: awayScore !== '' ? parseInt(awayScore, 10) : null,
+        predicted_home_score: homeScore !== '' && awayScore !== '' ? parseInt(homeScore, 10) : null,
+        predicted_away_score: homeScore !== '' && awayScore !== '' ? parseInt(awayScore, 10) : null,
       },
       { onConflict: 'user_id,match_id' }
     )
@@ -402,7 +402,7 @@ export default function MyBetsPage() {
             <div className="space-y-2">
               {myBettedFinished.map(m => {
                 const bet = userBets[m.id]
-                const exact = bet?.predicted_home_score != null
+                const exact = bet?.predicted_home_score != null && bet?.predicted_away_score != null
                 return (
                   <div
                     key={m.id}

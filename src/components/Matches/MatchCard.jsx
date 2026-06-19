@@ -176,9 +176,9 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
   const msToKickoff  = matchMs - now
   const minsToKick   = Math.floor(msToKickoff / 60_000)
 
-  // Feature 1: auto-lock 10 min before kickoff
-  const isAutoLocked  = match.status === 'upcoming' && minsToKick > 0 && minsToKick <= 10
-  const isCountdown   = match.status === 'upcoming' && !match.is_locked && minsToKick > 10 && minsToKick <= 60
+  // Auto-lock 5 min before kickoff
+  const isAutoLocked  = match.status === 'upcoming' && minsToKick > 0 && minsToKick <= 5
+  const isCountdown   = match.status === 'upcoming' && !match.is_locked && minsToKick > 5 && minsToKick <= 30
   const isBettingOpen = match.status === 'upcoming' && !match.is_locked && !isAutoLocked && msToKickoff > 0
   const isLocked      = match.is_locked || isAutoLocked || match.status !== 'upcoming'
   const isFinished    = match.status === 'finished'
@@ -228,8 +228,8 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
         user_id:              user.id,
         match_id:             match.id,
         prediction:           pred,
-        predicted_home_score: homeScore !== '' ? parseInt(homeScore, 10) : null,
-        predicted_away_score: awayScore !== '' ? parseInt(awayScore, 10) : null,
+        predicted_home_score: homeScore !== '' && awayScore !== '' ? parseInt(homeScore, 10) : null,
+        predicted_away_score: homeScore !== '' && awayScore !== '' ? parseInt(awayScore, 10) : null,
       },
       { onConflict: 'user_id,match_id' },
     )
@@ -351,7 +351,7 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
             <span>ניחוש קודם:</span>
             <span className="font-semibold text-slate-600">
               {BET_CFG[userBet.prediction]?.icon} {BET_CFG[userBet.prediction]?.label}
-              {userBet.predicted_home_score != null &&
+              {userBet.predicted_home_score != null && userBet.predicted_away_score != null &&
                 ` · ${userBet.predicted_home_score}–${userBet.predicted_away_score}`}
             </span>
           </div>
