@@ -8,6 +8,7 @@ import AdminMatchManager from '../components/Admin/AdminMatchManager'
 import AdminUserManager  from '../components/Admin/AdminUserManager'
 import AdminBracketManager from '../components/Admin/AdminBracketManager'
 import AdminResetPanel from '../components/Admin/AdminResetPanel'
+import AdminWhatsAppTools from '../components/Admin/AdminWhatsAppTools'
 import Spinner from '../components/UI/Spinner'
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'bracket',   label: 'מדרגי',       icon: '🎯' },
   { id: 'users',     label: 'משתמשים',     icon: '👥' },
   { id: 'reset',     label: 'איפוס',       icon: '🔄' },
+  { id: 'whatsapp',  label: 'וואטסאפ',    icon: '📲' },
 ]
 
 function AccessDenied() {
@@ -105,6 +107,7 @@ export default function AdminPage() {
         {tab === 'bracket'   && <AdminBracketManager />}
         {tab === 'users'     && <AdminUserManager />}
         {tab === 'reset'     && <AdminResetPanel />}
+        {tab === 'whatsapp'  && <AdminWhatsAppTools />}
       </main>
     </>
   )
