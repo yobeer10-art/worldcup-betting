@@ -88,13 +88,16 @@ export default function CompactMatchCard({ match, userBet, communityStats, onBet
   async function saveBet() {
     if (!pred || saving) return
     setSaving(true)
+    const hsVal = homeScore !== '' ? parseInt(homeScore, 10) : null
+    const asVal = awayScore !== '' ? parseInt(awayScore, 10) : null
+    const bothFilled = hsVal !== null && !isNaN(hsVal) && asVal !== null && !isNaN(asVal)
     const { error } = await supabase.from('bets').upsert(
       {
         user_id:              user.id,
         match_id:             match.id,
         prediction:           pred,
-        predicted_home_score: homeScore !== '' ? parseInt(homeScore, 10) : null,
-        predicted_away_score: awayScore !== '' ? parseInt(awayScore, 10) : null,
+        predicted_home_score: bothFilled ? hsVal : null,
+        predicted_away_score: bothFilled ? asVal : null,
       },
       { onConflict: 'user_id,match_id' }
     )
@@ -273,7 +276,7 @@ export default function CompactMatchCard({ match, userBet, communityStats, onBet
             {!saved && userBet?.prediction && pred === userBet.prediction && (
               <p className="text-[8px] text-slate-400 text-center">
                 ניחוש קודם: {BET[userBet.prediction]?.icon}
-                {userBet.predicted_home_score != null &&
+                {userBet.predicted_home_score != null && userBet.predicted_away_score != null &&
                   ` · ${userBet.predicted_home_score}–${userBet.predicted_away_score}`}
               </p>
             )}

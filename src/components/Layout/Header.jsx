@@ -1,115 +1,56 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { useAdmin } from '../../context/AdminContext'
 
-const NAV = [
-  { to: '/matches',     label: 'משחקים', icon: '⚽' },
-  { to: '/champion',    label: 'אלופה',  icon: '🥇', gold: true },
-  { to: '/bracket',     label: 'ברקט',   icon: '🎯' },
-  { to: '/tables',      label: 'טבלאות', icon: '📊' },
-  { to: '/leaderboard', label: 'דירוג',  icon: '🏆' },
-]
-
+/**
+ * Minimal top bar — logo + user points.
+ * Navigation is handled by BottomNav (mobile-first).
+ */
 export default function Header() {
   const { user, profile, signOut } = useAuth()
-  const { isAdmin }                = useAdmin()
-  const { pathname }               = useLocation()
 
   return (
-    <header className="sticky top-0 z-50">
-      {/* Accent line */}
-      <div className="h-[3px] bg-gradient-to-r from-emerald-400 via-teal-300 to-blue-400" />
+    <header className="sticky top-0 z-40 bg-white border-b border-slate-100
+                       shadow-sm backdrop-blur-sm bg-white/95">
+      <div className="max-w-lg mx-auto px-4 h-12 flex items-center justify-between">
 
-      <div className="bg-gradient-to-r from-green-900 via-green-800 to-emerald-700 shadow-2xl">
-        <div className="max-w-lg mx-auto px-4">
+        {/* Logo */}
+        <Link to="/" className="flex items-center gap-2 select-none group">
+          <span className="text-lg transition-transform duration-300 group-hover:rotate-[20deg]">⚽</span>
+          <span className="font-extrabold text-slate-800 text-sm tracking-tight">מונדיאל 2026</span>
+        </Link>
 
-          {/* Top row */}
-          <div className="flex items-center justify-between h-12">
-            <Link to="/matches" className="flex items-center gap-2 group select-none shrink-0">
-              <span className="text-xl transition-transform duration-300 group-hover:rotate-[20deg]">⚽</span>
-              <div>
-                <div className="font-extrabold text-white text-[14px] leading-none tracking-tight">
-                  מונדיאל 2026
+        {/* User area */}
+        <div className="flex items-center gap-2">
+          {user ? (
+            <>
+              {profile?.total_points != null && (
+                <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-200
+                               text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold">
+                  ⭐ {profile.total_points}
                 </div>
-                <div className="text-emerald-300 text-[9px] leading-none mt-[2px] tracking-wide">
-                  USA · Canada · Mexico
-                </div>
-              </div>
-            </Link>
-
-            <div className="flex items-center gap-1.5">
-              {user ? (
-                <>
-                  {profile?.total_points != null && (
-                    <div className="flex items-center gap-1 bg-white/10 border border-white/10 px-2 py-1 rounded-lg">
-                      <span className="text-xs">⭐</span>
-                      <span className="text-white font-extrabold text-xs tabular-nums">
-                        {profile.total_points}
-                      </span>
-                    </div>
-                  )}
-                  <span className="hidden sm:block text-emerald-200 text-xs max-w-[80px] truncate">
-                    {profile?.display_name || user.email}
-                  </span>
-                  <button
-                    onClick={signOut}
-                    className="text-xs bg-white/10 hover:bg-white/20 text-white px-2 py-1.5 rounded-lg transition-colors border border-white/10"
-                  >
-                    יציאה
-                  </button>
-                </>
-              ) : (
-                <Link
-                  to="/auth"
-                  className="text-sm bg-white text-green-900 hover:bg-green-50 px-3 py-1.5 rounded-lg font-bold shadow-lg transition-colors"
-                >
-                  כניסה
-                </Link>
               )}
-            </div>
-          </div>
-
-          {/* Nav tabs */}
-          <nav className="flex">
-            {NAV.map(({ to, label, icon, gold }) => {
-              const active = pathname === to
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1.5
-                    text-[10px] sm:text-xs font-semibold border-b-2 transition-all duration-200
-                    ${active
-                      ? gold
-                        ? 'text-amber-300 border-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]'
-                        : 'text-white border-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]'
-                      : gold
-                        ? 'text-amber-400/70 border-transparent hover:text-amber-300 hover:border-amber-500/40'
-                        : 'text-green-300/60 border-transparent hover:text-white hover:border-green-500/40'
-                    }`}
-                >
-                  <span className={`text-sm sm:text-xs ${active ? '' : 'opacity-70'}`}>{icon}</span>
-                  <span className="leading-none">{label}</span>
-                </Link>
-              )
-            })}
-
-            {/* Admin tab — admins only */}
-            {isAdmin && (
-              <Link
-                to="/admin"
-                className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 py-1.5
-                  text-[10px] sm:text-xs font-semibold border-b-2 transition-all duration-200
-                  ${pathname === '/admin'
-                    ? 'text-amber-300 border-amber-400'
-                    : 'text-amber-400/50 border-transparent hover:text-amber-300 hover:border-amber-500/40'
-                  }`}
+              {profile?.display_name && (
+                <span className="hidden sm:block text-slate-500 text-xs font-medium max-w-[80px] truncate">
+                  {profile.display_name}
+                </span>
+              )}
+              <button
+                onClick={signOut}
+                className="text-xs text-slate-400 hover:text-slate-600 font-medium
+                           transition-colors px-1.5 py-1"
               >
-                <span className="text-sm sm:text-xs opacity-70">🔐</span>
-                <span className="leading-none">ניהול</span>
-              </Link>
-            )}
-          </nav>
+                יציאה
+              </button>
+            </>
+          ) : (
+            <Link
+              to="/auth"
+              className="text-sm bg-emerald-500 hover:bg-emerald-600 text-white
+                         px-3 py-1.5 rounded-lg font-bold transition-colors shadow-sm"
+            >
+              כניסה
+            </Link>
+          )}
         </div>
       </div>
     </header>
