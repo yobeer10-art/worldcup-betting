@@ -110,19 +110,33 @@ export default function MyBetsPage() {
   }
 
   /* ── Match-level bet save ───────────────────────────────────── */
-  async function saveMatchBet(matchId, pred, homeScore, awayScore) {
-    if (!pred) return
+  async function saveMatchBet(matchId, pred, homeScore, awayScore, homeTeam, awayTeam) {
+    if (!pred) return null
+    // Normalize: both empty→null/null; one empty→default that side to 0
+    const bothEmpty = homeScore === '' && awayScore === ''
+    const hsVal = bothEmpty ? null : (homeScore !== '' ? parseInt(homeScore, 10) : 0)
+    const asVal = bothEmpty ? null : (awayScore !== '' ? parseInt(awayScore, 10) : 0)
+    // Validate consistency with winner pick after normalization
+    if (hsVal !== null) {
+      if (pred === 'home' && hsVal <= asVal)
+        return `לניצחון ${homeTeam}: הסכור (${hsVal}–${asVal}) לא מתאים לניצחון הבית`
+      if (pred === 'away' && asVal <= hsVal)
+        return `לניצחון ${awayTeam}: הסכור (${hsVal}–${asVal}) לא מתאים לניצחון האורח`
+      if (pred === 'draw' && hsVal !== asVal)
+        return `לתיקו — שני הסכורים חייבים להיות שווים`
+    }
     await supabase.from('bets').upsert(
       {
         user_id:              user.id,
         match_id:             matchId,
         prediction:           pred,
-        predicted_home_score: homeScore !== '' && awayScore !== '' ? parseInt(homeScore, 10) : null,
-        predicted_away_score: homeScore !== '' && awayScore !== '' ? parseInt(awayScore, 10) : null,
+        predicted_home_score: hsVal,
+        predicted_away_score: asVal,
       },
       { onConflict: 'user_id,match_id' }
     )
     fetchAll()
+    return null  // success
   }
 
   /* ── Computed stats ─────────────────────────────────────────── */
@@ -525,6 +539,7 @@ function UpcomingBetRow({ match, bet, onSave }) {
   const [saving,    setSaving]    = useState(false)
   const [saved,     setSaved]     = useState(false)
   const [scoreOpen, setScoreOpen] = useState(false)
+  const [scoreErr,  setScoreErr]  = useState(null)
 
   useEffect(() => {
     const ms = new Date(match.match_date).getTime()
@@ -562,8 +577,10 @@ function UpcomingBetRow({ match, bet, onSave }) {
   async function handleSave() {
     if (!pred || saving || isLocked) return
     setSaving(true)
-    await onSave(match.id, pred, homeScore, awayScore)
+    const err = await onSave(match.id, pred, homeScore, awayScore, match.home_team, match.away_team)
     setSaving(false)
+    if (err) { setScoreErr(err); return }
+    setScoreErr(null)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -644,6 +661,9 @@ function UpcomingBetRow({ match, bet, onSave }) {
             </div>
           )}
 
+          {scoreErr && (
+            <p className="text-[9px] text-rose-500 font-semibold text-center">{scoreErr}</p>
+          )}
           {pred && (
             <button
               onClick={handleSave}

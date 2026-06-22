@@ -60,6 +60,7 @@ export default function CompactMatchCard({ match, userBet, communityStats, onBet
   const [saving,   setSaving]   = useState(false)
   const [saved,    setSaved]    = useState(false)
   const [scoreOpen,setScoreOpen]= useState(false)
+  const [scoreErr, setScoreErr] = useState(null)
   const didCelebrate             = useRef(false)
 
   useEffect(() => {
@@ -87,17 +88,31 @@ export default function CompactMatchCard({ match, userBet, communityStats, onBet
   /* ── Save bet ────────────────────────────────────────────── */
   async function saveBet() {
     if (!pred || saving) return
+    // Normalize: both empty→null/null; one empty→default that side to 0
+    const bothEmpty = homeScore === '' && awayScore === ''
+    const hsVal = bothEmpty ? null : (homeScore !== '' ? parseInt(homeScore, 10) : 0)
+    const asVal = bothEmpty ? null : (awayScore !== '' ? parseInt(awayScore, 10) : 0)
+    // Validate consistency with winner pick after normalization
+    if (hsVal !== null) {
+      if (pred === 'home' && hsVal <= asVal) {
+        setScoreErr(`לניצחון ${match.home_team}: הסכור (${hsVal}–${asVal}) לא מתאים`); return
+      }
+      if (pred === 'away' && asVal <= hsVal) {
+        setScoreErr(`לניצחון ${match.away_team}: הסכור (${hsVal}–${asVal}) לא מתאים`); return
+      }
+      if (pred === 'draw' && hsVal !== asVal) {
+        setScoreErr(`לתיקו — שני הסכורים חייבים להיות שווים`); return
+      }
+    }
+    setScoreErr(null)
     setSaving(true)
-    const hsVal = homeScore !== '' ? parseInt(homeScore, 10) : null
-    const asVal = awayScore !== '' ? parseInt(awayScore, 10) : null
-    const bothFilled = hsVal !== null && !isNaN(hsVal) && asVal !== null && !isNaN(asVal)
     const { error } = await supabase.from('bets').upsert(
       {
         user_id:              user.id,
         match_id:             match.id,
         prediction:           pred,
-        predicted_home_score: bothFilled ? hsVal : null,
-        predicted_away_score: bothFilled ? asVal : null,
+        predicted_home_score: hsVal,
+        predicted_away_score: asVal,
       },
       { onConflict: 'user_id,match_id' }
     )
@@ -258,6 +273,11 @@ export default function CompactMatchCard({ match, userBet, communityStats, onBet
                   </>
                 )}
               </div>
+            )}
+
+            {/* Score error */}
+            {scoreErr && (
+              <p className="text-[9px] text-rose-500 font-semibold text-center leading-tight">{scoreErr}</p>
             )}
 
             {/* Save button */}

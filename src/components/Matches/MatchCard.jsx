@@ -51,8 +51,16 @@ function broadcastChannels(broadcast) {
     : ['כאן BOX', 'ספורט 1']
 }
 
+/* Normalize: both empty→null/null; one empty→default that side to 0 */
+function normalizeScores(hs, as_) {
+  if (hs === '' && as_ === '') return { hsVal: null, asVal: null }
+  return {
+    hsVal: hs  !== '' ? parseInt(hs,  10) : 0,
+    asVal: as_ !== '' ? parseInt(as_, 10) : 0,
+  }
+}
+/* Live validation — stays silent while user is mid-typing (one side empty) */
 function validateScore(pred, hs, as_, homeTeam, awayTeam) {
-  if (hs === '' && as_ === '') return null
   if (hs === '' || as_ === '') return null   // mid-typing — silent
   const h = parseInt(hs, 10), a = parseInt(as_, 10)
   if (isNaN(h) || isNaN(a) || h < 0 || a < 0) return 'מספרים חיוביים בלבד (0-99)'
@@ -62,10 +70,20 @@ function validateScore(pred, hs, as_, homeTeam, awayTeam) {
   if (pred === 'draw' && h !== a) return 'לתיקו — שני הסכורים חייבים להיות שווים'
   return null
 }
+/* Save-time consistency check on normalized values */
+function validateNormalized(pred, hsVal, asVal, homeTeam, awayTeam) {
+  if (hsVal === null) return null
+  if (isNaN(hsVal) || isNaN(asVal) || hsVal < 0 || asVal < 0) return 'מספרים חיוביים בלבד (0-99)'
+  if (pred === 'home' && hsVal <= asVal) return `לניצחון ${homeTeam}: הסכור (${hsVal}–${asVal}) לא מתאים לניצחון הבית`
+  if (pred === 'away' && asVal <= hsVal) return `לניצחון ${awayTeam}: הסכור (${hsVal}–${asVal}) לא מתאים לניצחון האורח`
+  if (pred === 'draw' && hsVal !== asVal) return `לתיקו — שני הסכורים חייבים להיות שווים (${hsVal}–${asVal})`
+  return null
+}
 function isSaveBlocked(pred, hs, as_, homeTeam, awayTeam) {
-  if (hs === '' && as_ === '') return false
-  if (hs === '' || as_ === '') return true
-  return validateScore(pred, hs, as_, homeTeam, awayTeam) !== null
+  if (hs === '' && as_ === '') return false      // no score at all — ok
+  if (hs !== '' && as_ !== '')                   // both filled: check live
+    return validateScore(pred, hs, as_, homeTeam, awayTeam) !== null
+  return false  // one side empty: will normalize at save time — don't block
 }
 
 /* ── Community odds bar ──────────────────────────────────── */
@@ -221,15 +239,19 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
 
   async function saveBet() {
     if (!pred) { setError('בחר תחילה מי ינצח'); return }
-    if (saveBlocked) { setError(scoreErr ?? 'הזן ניחוש סכור לשתי הקבוצות'); return }
+    if (saveBlocked) { setError(scoreErr ?? 'ניחוש סכור לא תקין'); return }
+    // Normalize: one-empty side defaults to 0
+    const { hsVal, asVal } = normalizeScores(homeScore, awayScore)
+    const normErr = validateNormalized(pred, hsVal, asVal, match.home_team, match.away_team)
+    if (normErr) { setError(normErr); return }
     setSaving(true); setError(null)
     const { error: err } = await supabase.from('bets').upsert(
       {
         user_id:              user.id,
         match_id:             match.id,
         prediction:           pred,
-        predicted_home_score: homeScore !== '' && awayScore !== '' ? parseInt(homeScore, 10) : null,
-        predicted_away_score: homeScore !== '' && awayScore !== '' ? parseInt(awayScore, 10) : null,
+        predicted_home_score: hsVal,
+        predicted_away_score: asVal,
       },
       { onConflict: 'user_id,match_id' },
     )
