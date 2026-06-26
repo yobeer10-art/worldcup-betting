@@ -20,6 +20,17 @@ function israelShortDate(iso) {
     timeZone: 'Asia/Jerusalem', weekday: 'short', day: 'numeric', month: 'short',
   })
 }
+function israelDateStr(iso) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }) // 'YYYY-MM-DD'
+}
+function israelTodayStr() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+}
+function subtractDays(dateStr, n) {
+  const d = new Date(`${dateStr}T12:00:00+03:00`)
+  d.setDate(d.getDate() - n)
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+}
 
 /* ── All unique teams from GROUPS ─────────────────────────────── */
 const ALL_TEAMS = [...new Set(GROUPS.flatMap(g => g.teams))]
@@ -151,7 +162,12 @@ export default function MyBetsPage() {
   const totalPoints   = matchPoints + champPoints + scorerPoints
 
   /* ── Split matches ──────────────────────────────────────────── */
-  const finishedMatches  = allMatches.filter(m => m.status === 'finished').reverse()
+  const today2daysAgo = subtractDays(israelTodayStr(), 2)  // 'YYYY-MM-DD' cutoff
+
+  // Finished: only show last 2 days (by match date in Israel timezone), most recent first
+  const finishedMatches  = allMatches
+    .filter(m => m.status === 'finished' && israelDateStr(m.match_date) >= today2daysAgo)
+    .reverse()
   const upcomingMatches  = allMatches.filter(m => m.status === 'upcoming')
   const myBettedFinished = finishedMatches.filter(m => userBets[m.id])
   const myBettedUpcoming = upcomingMatches.filter(m => userBets[m.id])

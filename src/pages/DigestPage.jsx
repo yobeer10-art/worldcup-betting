@@ -220,25 +220,27 @@ function MatchDigestCard({ match, bets, isToday }) {
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function DigestPage() {
-  const [matches,  setMatches]  = useState([])
+  const [matches,     setMatches]     = useState([])
   const [betsByMatch, setBetsByMatch] = useState({})
-  const [loading,  setLoading]  = useState(true)
+  const [loading,     setLoading]     = useState(true)
+  const [pastOpen,    setPastOpen]    = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
 
     const today    = israelToday()
     const tomorrow = addDays(today, 1)
+    const twoDaysAgo = addDays(today, -2)
 
-    /* Fetch today + tomorrow matches */
-    const todayStartUTC    = new Date(`${today}T00:00:00+03:00`).toISOString()
-    const tomorrowEndUTC   = new Date(`${tomorrow}T23:59:59+03:00`).toISOString()
+    /* Fetch 2 days ago → tomorrow */
+    const windowStartUTC = new Date(`${twoDaysAgo}T00:00:00+03:00`).toISOString()
+    const windowEndUTC   = new Date(`${tomorrow}T23:59:59+03:00`).toISOString()
 
     const { data: matchData } = await supabase
       .from('matches')
       .select('*')
-      .gte('match_date', todayStartUTC)
-      .lte('match_date', tomorrowEndUTC)
+      .gte('match_date', windowStartUTC)
+      .lte('match_date', windowEndUTC)
       .order('match_date')
 
     const matches = matchData ?? []
@@ -266,12 +268,22 @@ export default function DigestPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  /* ── Split today vs tomorrow ─────────────────────────────── */
+  /* ── Split by day ────────────────────────────────────────── */
   const today    = israelToday()
   const tomorrow = addDays(today, 1)
+  const yesterday   = addDays(today, -1)
+  const twoDaysAgo  = addDays(today, -2)
 
   const todayMatches    = matches.filter(m => israelDate(m.match_date) === today)
   const tomorrowMatches = matches.filter(m => israelDate(m.match_date) === tomorrow)
+  // Past 2 days, most-recent-first
+  const pastMatches     = matches
+    .filter(m => {
+      const d = israelDate(m.match_date)
+      return d === yesterday || d === twoDaysAgo
+    })
+    .slice()
+    .reverse()
 
   /* ── Total bet count summary ─────────────────────────────── */
   const totalBets  = Object.values(betsByMatch).reduce((s, arr) => s + arr.length, 0)
@@ -286,7 +298,7 @@ export default function DigestPage() {
         <div>
           <h1 className="text-xl font-extrabold text-slate-800">👥 ריכוז הימורים</h1>
           <p className="text-slate-400 text-xs mt-0.5">
-            היום ומחר · {totalBets > 0 ? `${totalBets} הימורים בסך הכל` : 'ממתין להימורים'}
+            יומיים אחורה עד מחר · {totalBets > 0 ? `${totalBets} הימורים בסך הכל` : 'ממתין להימורים'}
           </p>
         </div>
 
@@ -295,7 +307,7 @@ export default function DigestPage() {
         ) : matches.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <div className="text-5xl">⚽</div>
-            <p className="text-slate-500 font-semibold">אין משחקים היום ומחר</p>
+            <p className="text-slate-500 font-semibold">אין משחקים בטווח</p>
           </div>
         ) : (
           <>
@@ -311,14 +323,8 @@ export default function DigestPage() {
                   </div>
                   <div className="flex-1 h-px bg-emerald-200" />
                 </div>
-
                 {todayMatches.map(m => (
-                  <MatchDigestCard
-                    key={m.id}
-                    match={m}
-                    bets={betsByMatch[m.id] ?? []}
-                    isToday
-                  />
+                  <MatchDigestCard key={m.id} match={m} bets={betsByMatch[m.id] ?? []} isToday />
                 ))}
               </section>
             )}
@@ -335,15 +341,53 @@ export default function DigestPage() {
                   </div>
                   <div className="flex-1 h-px bg-sky-200" />
                 </div>
-
                 {tomorrowMatches.map(m => (
-                  <MatchDigestCard
-                    key={m.id}
-                    match={m}
-                    bets={betsByMatch[m.id] ?? []}
-                    isToday={false}
-                  />
+                  <MatchDigestCard key={m.id} match={m} bets={betsByMatch[m.id] ?? []} isToday={false} />
                 ))}
+              </section>
+            )}
+
+            {/* PAST 2 DAYS — collapsible */}
+            {pastMatches.length > 0 && (
+              <section className="space-y-3">
+                {/* Toggle header */}
+                <button
+                  onClick={() => setPastOpen(o => !o)}
+                  className="w-full flex items-center gap-2 select-none"
+                >
+                  <div className="flex-1 h-px bg-slate-200" />
+                  <div className="flex items-center gap-1.5 bg-slate-500 text-white
+                                  text-xs font-extrabold px-3 py-1 rounded-full">
+                    <span>📁</span>
+                    <span>ימים קודמים ({pastMatches.length} משחקים)</span>
+                    <span className="text-slate-300 text-[10px]">{pastOpen ? '▲' : '▼'}</span>
+                  </div>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </button>
+
+                {pastOpen && (() => {
+                  // Group past matches by day, most-recent day first
+                  const dayOrder = [yesterday, twoDaysAgo].filter(d =>
+                    pastMatches.some(m => israelDate(m.match_date) === d)
+                  )
+                  return dayOrder.map(day => (
+                    <div key={day} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-slate-100" />
+                        <span className="text-[10px] font-bold text-slate-400 px-2">
+                          {hebrewDayLabel(day)}
+                        </span>
+                        <div className="flex-1 h-px bg-slate-100" />
+                      </div>
+                      {pastMatches
+                        .filter(m => israelDate(m.match_date) === day)
+                        .map(m => (
+                          <MatchDigestCard key={m.id} match={m} bets={betsByMatch[m.id] ?? []} isToday={false} />
+                        ))
+                      }
+                    </div>
+                  ))
+                })()}
               </section>
             )}
           </>
