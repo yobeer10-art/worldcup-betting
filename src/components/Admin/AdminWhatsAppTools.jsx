@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import html2canvas from 'html2canvas'
 import { supabase } from '../../lib/supabase'
+import AdminDailyRecap from './AdminDailyRecap'
 
 /* ── Israel timezone helpers ──────────────────────────────────── */
 function israelToday() {
@@ -339,6 +340,21 @@ export default function AdminWhatsAppTools() {
         </div>
         <div className="p-5">
           <LeaderboardImage />
+        </div>
+      </div>
+
+      {/* Section 3 */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4">
+          <h2 className="text-white font-extrabold text-base flex items-center gap-2">
+            🌟 סיכום יומי
+          </h2>
+          <p className="text-purple-100 text-xs mt-0.5">
+            סיכום הלילה — כוכב, מדויקים, הפתעות, דירוג מעודכן
+          </p>
+        </div>
+        <div className="p-5">
+          <AdminDailyRecap />
         </div>
       </div>
 
