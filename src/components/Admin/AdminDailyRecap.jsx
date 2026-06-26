@@ -39,14 +39,13 @@ function rankChangeStr(delta) {
 
 /* ── Message builder ──────────────────────────────────────────── */
 
-function buildMessage({ matches, betsData, ranked, stars, maxRoundPts, exactBets, upsets, hasSnapshot, roundStart }) {
+function buildMessage({ matches, ranked, stars, maxRoundPts, exactBets, roundStart }) {
   const lines = []
 
-  // Header: label is the "evening" date (noon of round start day in IL time)
   const eveningDate = new Date(roundStart.getTime() + 12 * 3_600_000)
-  const roundLabel = hebrewDate(eveningDate)
+  const roundLabel  = hebrewDate(eveningDate)
 
-  lines.push(`🌟 *סיכום מונדיאל 2026 – ${roundLabel}* 🌟`, '')
+  lines.push(`🌟 *סיכום הסיבוב – ${roundLabel}* 🌟`, '')
 
   if (matches.length === 0) {
     lines.push('לא היו משחקים בסיבוב זה ⚽')
@@ -54,76 +53,35 @@ function buildMessage({ matches, betsData, ranked, stars, maxRoundPts, exactBets
     return lines.join('\n')
   }
 
-  // ── Matches played ──────────────────────────────────────────
-  lines.push(`🏟 *משחקי הסיבוב* (${matches.length} משחקים):`)
-  for (const m of matches) {
-    lines.push(`• ${israelTime(m.match_date)} | ${m.home_team} *${m.home_score}–${m.away_score}* ${m.away_team}`)
-  }
-  lines.push('')
-
-  // ── Star of the round ───────────────────────────────────────
+  // ── 1. Star of the round ────────────────────────────────────
   if (stars.length > 0) {
-    lines.push('⭐ *כוכב הסיבוב*')
-    const starStr = stars.length === 1 ? stars[0] : stars.slice(0, -1).join(', ') + ' ו' + stars[stars.length - 1]
-    lines.push(`${starStr} עם *+${maxRoundPts} נקודות* הלילה! 🔥`, '')
+    const starStr = stars.length === 1
+      ? stars[0]
+      : stars.slice(0, -1).join(', ') + ' ו' + stars[stars.length - 1]
+    lines.push(`⭐ *כוכב הסיבוב*: ${starStr} עם *+${maxRoundPts} נקודות* הלילה! 🔥`, '')
   }
 
-  // ── Exact scores (3-pointers) ───────────────────────────────
+  // ── 2. Points per user this round (single compact line) ─────
+  const allSorted = [...ranked].sort((a, b) => b.roundPts - a.roundPts)
+  const ptsParts  = allSorted.map(u => `${u.display_name} +${u.roundPts}`)
+  lines.push(`📊 *ניקוד הסיבוב*: ${ptsParts.join(' · ')}`, '')
+
+  // ── 3. Exact scores ─────────────────────────────────────────
   if (exactBets.length > 0) {
-    lines.push('🎯 *ניחושים מדויקים (3 נק׳)*:')
+    lines.push('🎯 *ניחושים מדויקים*:')
     for (const b of exactBets) {
-      const m = matches.find(m => m.id === b.match_id)
+      const m    = matches.find(m => m.id === b.match_id)
       if (!m) continue
       const name = b.users?.display_name ?? 'שחקן'
-      lines.push(`• ${name}: ${m.home_team} *${m.home_score}–${m.away_score}* ${m.away_team} 🌟`)
+      lines.push(`• ${name}: ${m.home_team}–${m.away_team} 🌟`)
     }
     lines.push('')
   } else {
     lines.push('🎯 אף אחד לא ניחש תוצאה מדויקת הפעם', '')
   }
 
-  // ── Upsets ─────────────────────────────────────────────────
-  if (upsets.length > 0) {
-    lines.push('😮 *הפתעות הסיבוב*:')
-    for (const u of upsets) {
-      const m = u.match
-      const resultLabel = m.home_score > m.away_score ? m.home_team
-        : m.away_score > m.home_score ? m.away_team : 'תיקו'
-      const winnerStr = u.winners.join(', ')
-      lines.push(`• ${m.home_team} נגד ${m.away_team} — רק *${u.pct}%* ניחשו ${resultLabel}`)
-      lines.push(`  🏅 ${winnerStr} ניחשו נכון!`)
-    }
-    lines.push('')
-  }
-
-  // ── Points this round ───────────────────────────────────────
-  const withPts    = ranked.filter(u => u.roundPts > 0).sort((a, b) => b.roundPts - a.roundPts)
-  const withoutPts = ranked.filter(u => u.roundPts === 0)
-
-  if (withPts.length > 0 || withoutPts.length > 0) {
-    lines.push('📊 *נקודות הסיבוב*:')
-    for (const u of withPts) {
-      lines.push(`• ${u.display_name}: *+${u.roundPts}*`)
-    }
-    if (withoutPts.length > 0) {
-      lines.push(`• ${withoutPts.map(u => u.display_name).join(', ')}: 0`)
-    }
-    lines.push('')
-  }
-
-  // ── Leaderboard ─────────────────────────────────────────────
-  lines.push('🏆 *טבלה מעודכנת*:')
-  for (const u of ranked) {
-    const icon   = u.rank <= 3 ? RANK_ICON[u.rank - 1] : `${u.rank}.`
-    const change = hasSnapshot ? rankChangeStr(u.rankChange) : ''
-    lines.push(`${icon} ${u.display_name} – *${u.total_points}נק׳*${change}`)
-  }
-
-  if (!hasSnapshot) {
-    lines.push('', '_סיבוב ראשון — אין נתוני השוואה קודמים_')
-  }
-
-  lines.push('', '⚽ בהצלחה אלופים! המונדיאל ממשיך! 🔥', `🔗 ${APP_LINK}`)
+  lines.push('⚽ כל הכבוד לכולם! המשך מונדיאל מטורף! 🔥')
+  lines.push(`🔗 ${APP_LINK}`)
 
   return lines.join('\n')
 }
@@ -230,7 +188,7 @@ export default function AdminDailyRecap() {
     }
 
     /* ── 6. Build message ─────────────────────────────────── */
-    const msg = buildMessage({ matches, betsData, ranked, stars, maxRoundPts, exactBets, upsets, hasSnapshot, roundStart })
+    const msg = buildMessage({ matches, ranked, stars, maxRoundPts, exactBets, roundStart })
     setText(msg)
     setMeta({ matchCount: matches.length, exactCount: exactBets.length, upsetCount: upsets.length, hasSnapshot, stars })
     setLoading(false)
