@@ -12,6 +12,11 @@ function israelToday() {
 function israelDate(iso) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
 }
+function subtractDays(dateStr, n) {
+  const d = new Date(`${dateStr}T12:00:00+03:00`)
+  d.setDate(d.getDate() - n)
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+}
 function hebrewDateLabel(dateStr) {
   return new Date(`${dateStr}T12:00:00+03:00`).toLocaleDateString('he-IL', {
     timeZone: 'Asia/Jerusalem',
@@ -89,11 +94,25 @@ export default function DailyBetsPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   /* ── Split matches into sections ─────────────────────────── */
-  const today    = israelToday()
+  const today      = israelToday()
+  const twoDaysAgo = subtractDays(today, 2)
+
+  // Recent finished: last 2 calendar days (not today), newest first, grouped by day
+  const recentFinished = allMatches
+    .filter(m => m.status === 'finished' &&
+      israelDate(m.match_date) >= twoDaysAgo &&
+      israelDate(m.match_date) < today)
+    .reverse()
+  const recentFinishedByDate = {}
+  for (const m of recentFinished) {
+    const d = israelDate(m.match_date)
+    if (!recentFinishedByDate[d]) recentFinishedByDate[d] = []
+    recentFinishedByDate[d].push(m)
+  }
+  const recentFinishedDates = Object.keys(recentFinishedByDate).sort().reverse()
 
   const todayMatches    = allMatches.filter(m => israelDate(m.match_date) === today)
   const upcomingMatches = allMatches.filter(m => israelDate(m.match_date) > today && m.status !== 'finished')
-  const finishedMatches = allMatches.filter(m => m.status === 'finished' && israelDate(m.match_date) !== today)
 
   // Group upcoming by date
   const upcomingByDate = {}
@@ -119,6 +138,27 @@ export default function DailyBetsPage() {
           </div>
         ) : (
           <>
+            {/* ── RECENT FINISHED (last 2 days, newest day first) ── */}
+            {recentFinishedDates.map(dateStr => (
+              <section key={dateStr}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex-1 h-px bg-slate-200" />
+                  <span className="text-xs font-bold text-slate-400 bg-slate-100
+                                   px-2.5 py-1 rounded-full">
+                    ✅ {hebrewShortDate(dateStr)}
+                  </span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
+                <MatchGrid
+                  matches={recentFinishedByDate[dateStr]}
+                  userBets={userBets}
+                  stats={stats}
+                  today={today}
+                  onBetPlaced={fetchData}
+                />
+              </section>
+            ))}
+
             {/* ── TODAY ──────────────────────────────────────── */}
             {todayMatches.length > 0 && (
               <section>
@@ -150,7 +190,7 @@ export default function DailyBetsPage() {
               </div>
             )}
 
-            {/* ── UPCOMING (grouped by date) ──────────────────── */}
+            {/* ── UPCOMING (grouped by date, all future matches) ── */}
             {upcomingDates.map(dateStr => (
               <section key={dateStr}>
                 <div className="flex items-center gap-2 mb-3">
@@ -170,27 +210,6 @@ export default function DailyBetsPage() {
                 />
               </section>
             ))}
-
-            {/* ── FINISHED ───────────────────────────────────── */}
-            {finishedMatches.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex-1 h-px bg-slate-200" />
-                  <span className="text-xs font-bold text-slate-400 bg-slate-100
-                                   px-2.5 py-1 rounded-full">
-                    ✅ שנגמרו ({finishedMatches.length})
-                  </span>
-                  <div className="flex-1 h-px bg-slate-200" />
-                </div>
-                <MatchGrid
-                  matches={[...finishedMatches].reverse()}
-                  userBets={userBets}
-                  stats={stats}
-                  today={today}
-                  onBetPlaced={fetchData}
-                />
-              </section>
-            )}
           </>
         )}
 
