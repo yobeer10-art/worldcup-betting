@@ -58,7 +58,7 @@ function Countdown() {
 }
 
 // Round section
-function RoundSection({ round, matches, predictions, locked, onSaved }) {
+function RoundSection({ round, matches, predictions, onSaved }) {
   const cfg        = ROUNDS.find(r => r.id === round)
   const total      = matches.length
   const finished   = matches.filter(m => m.status === 'finished').length
@@ -82,7 +82,7 @@ function RoundSection({ round, matches, predictions, locked, onSaved }) {
             {teamsKnown}/{total} קבוצות ידועות
           </span>
         )}
-        {teamsKnown === total && userPicked < total && !locked && (
+        {teamsKnown === total && userPicked < total && (
           <span className="mr-auto text-xs bg-blue-50 text-blue-600 border border-blue-200
                            px-2.5 py-1 rounded-full font-semibold">
             ניחשת {userPicked}/{total}
@@ -156,23 +156,6 @@ export default function BracketPage() {
     else setLoading(false)
   }, [fetchData, unlocked])
 
-  // ── Global bracket betting lock ───────────────────────────────
-  // Locks 5 minutes before the earliest R32 match with a known date.
-  const [nowMs, setNowMs] = useState(Date.now)
-  useEffect(() => {
-    const t = setInterval(() => setNowMs(Date.now()), 30_000)
-    return () => clearInterval(t)
-  }, [])
-
-  const firstR32Time = bracketMatches
-    .filter(m => m.round === 'round_of_32' && m.match_date)
-    .reduce((min, m) => {
-      const t = new Date(m.match_date).getTime()
-      return t < min ? t : min
-    }, Infinity)
-
-  const isBracketLocked = firstR32Time < Infinity && nowMs >= firstR32Time - 5 * 60 * 1000
-
   // Group matches by round
   const byRound = {}
   for (const m of bracketMatches) {
@@ -209,20 +192,16 @@ export default function BracketPage() {
               <h2 className="font-extrabold text-base">מדרגי הנוקאאוט</h2>
               <p className="text-slate-400 text-xs">
                 {unlocked
-                  ? isBracketLocked
-                    ? 'ההימורים נעולים — צפה בתוצאות'
-                    : 'נחש מי יעלה בכל שלב'
+                  ? 'נחש מי יעלה בכל שלב'
                   : 'נפתח לאחר סיום שלב הבתים (28 ביוני 2026)'}
               </p>
             </div>
             <span className={`mr-auto text-xs font-bold px-2.5 py-1 rounded-full ${
               !unlocked
                 ? 'bg-white/10 text-slate-400 border border-white/10'
-                : isBracketLocked
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
             }`}>
-              {!unlocked ? '🔒 נעול' : isBracketLocked ? '🔒 הימורים נעולו' : '✅ פתוח להימורים'}
+              {!unlocked ? '🔒 נעול' : '✅ פתוח להימורים'}
             </span>
           </div>
 
@@ -254,20 +233,7 @@ export default function BracketPage() {
           </div>
         )}
 
-        {/* Locked banner */}
-        {unlocked && isBracketLocked && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-center gap-3">
-            <span className="text-2xl">🔒</span>
-            <div>
-              <p className="font-extrabold text-amber-800 text-sm">ההימורים נעולו</p>
-              <p className="text-xs text-amber-600 mt-0.5">
-                ניתן לצפות בתוצאות ובנקודות בלבד — לא ניתן לשנות ניחושים
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Bracket content */}
+{/* Bracket content */}
         {unlocked && (
           <>
             {/* User stats */}
@@ -306,7 +272,7 @@ export default function BracketPage() {
                       round={id}
                       matches={matches}
                       predictions={predictions}
-                      locked={isBracketLocked}
+                      locked={false}
                       onSaved={fetchData}
                     />
                   )
