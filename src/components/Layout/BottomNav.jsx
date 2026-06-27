@@ -1,13 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAdmin } from '../../context/AdminContext'
 
-// Bracket tab hidden until June 28 — keep route/code, just not in nav
 const TABS = [
   { to: '/',            icon: '🏠', label: 'בית'          },
   { to: '/matches',     icon: '⚽', label: 'הימורים'      },
+  { to: '/bracket',     icon: '🎯', label: 'ברקט'         },
   { to: '/digest',      icon: '👥', label: 'ריכוז'        },
   { to: '/mybets',      icon: '📋', label: 'שלי'          },
-  { to: '/special',     icon: '🏆', label: 'ניחושים'      },
   { to: '/leaderboard', icon: '📊', label: 'דירוג'        },
 ]
 
