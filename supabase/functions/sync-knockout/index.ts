@@ -1,21 +1,24 @@
 // ================================================================
-// Supabase Edge Function: sync-knockout
+// Supabase Edge Function: sync-knockout  (v2)
 // Syncs WC 2026 knockout-stage match data from football-data.org:
 //   • Populates R32 home_team / away_team as FIFA confirms them
 //   • Updates match_date for all knockout matches
 //   • For FINISHED knockout matches: sets result, grades predictions,
 //     and auto-advances winner to the correct next-round slot
 //
-// Deploy:
-//   supabase functions deploy sync-knockout
-// Trigger (e.g. daily cron, or call manually from admin panel):
-//   curl -X POST https://<ref>.supabase.co/functions/v1/sync-knockout \
-//     -H "Authorization: Bearer <anon_key>"
+// Matching strategy (in order):
+//   1. By Hebrew team names (when DB rows already have teams)
+//   2. By date ±3h within same round (when DB rows have match_date)
+//   3. By date-sorted position within round (initial seeding – no DB dates yet)
+//      Sorts API matches and DB rows for the same round both by date,
+//      then pairs them 1-to-1 so we assign dates + teams in schedule order.
+//
+// Deploy:  supabase functions deploy sync-knockout
 // ================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// ── Same team map as sync-results ────────────────────────────────
+// ── Team name map (English API → Hebrew) ─────────────────────────
 const TEAM_MAP: Record<string, string> = {
   'Mexico': 'מקסיקו', 'Canada': 'קנדה',
   'United States': 'ארצות הברית', 'USA': 'ארצות הברית',
@@ -69,10 +72,11 @@ const TEAM_MAP: Record<string, string> = {
 }
 
 function mapTeam(name: string): string | null {
-  return TEAM_MAP[name] ?? null
+  if (!name || name.trim() === '' || name === 'TBD') return null
+  return TEAM_MAP[name.trim()] ?? null
 }
 
-// ── Winner-advance map (match_number → { toMatch, slot }) ────────
+// ── Winner-advance map ────────────────────────────────────────────
 const ADVANCE: Record<number, { toMatch: number; slot: 'home' | 'away' }> = {
    73: { toMatch:  90, slot: 'home' }, 74: { toMatch:  89, slot: 'home' },
    75: { toMatch:  90, slot: 'away' }, 76: { toMatch:  91, slot: 'home' },
@@ -97,24 +101,23 @@ const ROUND_PTS: Record<string, number> = {
   semi: 8, third_place: 3, final: 12,
 }
 
-// API stage values → DB round values
+// API stage → DB round
 const STAGE_MAP: Record<string, string> = {
-  'LAST_32':       'round_of_32',
-  'LAST_16':       'round_of_16',
-  'QUARTER_FINALS':'quarter',
-  'SEMI_FINALS':   'semi',
-  'THIRD_PLACE':   'third_place',
-  'FINAL':         'final',
+  'LAST_32':        'round_of_32',
+  'LAST_16':        'round_of_16',
+  'QUARTER_FINALS': 'quarter',
+  'SEMI_FINALS':    'semi',
+  'THIRD_PLACE':    'third_place',
+  'FINAL':          'final',
 }
 
 interface ApiMatch {
   id:        number
   utcDate:   string
-  status:    string   // 'SCHEDULED' | 'IN_PLAY' | 'PAUSED' | 'FINISHED' | ...
+  status:    string
   stage:     string
-  matchday?: number
-  homeTeam:  { name: string }
-  awayTeam:  { name: string }
+  homeTeam:  { id?: number; name: string; shortName?: string }
+  awayTeam:  { id?: number; name: string; shortName?: string }
   score: {
     winner:   'HOME_TEAM' | 'AWAY_TEAM' | null
     fullTime: { home: number | null; away: number | null }
@@ -135,7 +138,6 @@ Deno.serve(async () => {
   let teamsUpdated = 0, resultsSet = 0, errors = 0
 
   try {
-    // Fetch all WC 2026 matches (knockout stages only)
     const apiRes = await fetch(
       'https://api.football-data.org/v4/competitions/WC/matches',
       { headers: { 'X-Auth-Token': apiKey } },
@@ -144,9 +146,17 @@ Deno.serve(async () => {
 
     const { matches: allMatches }: { matches: ApiMatch[] } = await apiRes.json()
     const koMatches = allMatches.filter(m => STAGE_MAP[m.stage])
-    log.push(`API: ${allMatches.length} total matches, ${koMatches.length} knockout`)
+    log.push(`API: ${allMatches.length} total, ${koMatches.length} knockout`)
 
-    // Load all DB knockout rows (indexed by match_number)
+    // ── Debug: dump first 5 knockout matches raw ─────────────────
+    for (const m of koMatches.slice(0, 5)) {
+      log.push(
+        `  [RAW] ${m.stage} | ${m.utcDate} | ` +
+        `home="${m.homeTeam.name}" away="${m.awayTeam.name}" | status=${m.status}`
+      )
+    }
+
+    // Load all DB knockout rows
     const { data: dbRows } = await supabase
       .from('knockout_bracket_matches')
       .select('*')
@@ -157,33 +167,138 @@ Deno.serve(async () => {
       if (row.match_number) dbByNum[row.match_number] = row
     }
 
+    // ── Strategy 3: date-sorted bulk assignment per round ─────────
+    // For each round, gather API matches AND DB rows that still have no teams.
+    // Sort both by date. Pair them 1-to-1 to seed dates and teams together.
+    // Only runs for rounds where at least one DB row still has no home_team.
+    const roundsNeedingSeeding = new Set<string>()
+    for (const row of Object.values(dbByNum)) {
+      if (!row.home_team) roundsNeedingSeeding.add(row.round as string)
+    }
+
+    if (roundsNeedingSeeding.size > 0) {
+      // Group API matches by round
+      const apiByRound: Record<string, ApiMatch[]> = {}
+      for (const m of koMatches) {
+        const dbRound = STAGE_MAP[m.stage]
+        if (!apiByRound[dbRound]) apiByRound[dbRound] = []
+        apiByRound[dbRound].push(m)
+      }
+
+      for (const dbRound of roundsNeedingSeeding) {
+        const apiForRound = (apiByRound[dbRound] ?? [])
+          .filter(m => {
+            // Only consider API matches that have at least a real date and real teams OR just a date
+            return m.utcDate && m.utcDate !== ''
+          })
+          .sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime())
+
+        const dbForRound = Object.values(dbByNum)
+          .filter(r => r.round === dbRound && !r.home_team)
+          .sort((a, b) => (a.position as number) - (b.position as number))
+
+        log.push(
+          `  [SEED] round=${dbRound}: ${apiForRound.length} API matches, ` +
+          `${dbForRound.length} DB rows need seeding`
+        )
+
+        // Check if any API match in this round has real team names
+        const anyTeamsKnown = apiForRound.some(m => mapTeam(m.homeTeam.name) && mapTeam(m.awayTeam.name))
+        if (!anyTeamsKnown) {
+          // Only dates available (teams TBD) — just seed dates/positions by order
+          const limit = Math.min(apiForRound.length, dbForRound.length)
+          for (let i = 0; i < limit; i++) {
+            const apiM  = apiForRound[i]
+            const dbRow = dbForRound[i]
+            if (dbRow.match_date) continue // already has a date
+            const { error } = await supabase
+              .from('knockout_bracket_matches')
+              .update({ match_date: apiM.utcDate })
+              .eq('id', dbRow.id as string)
+            if (error) { errors++; log.push(`  ERR seed date M${dbRow.match_number}: ${error.message}`) }
+            else {
+              dbRow.match_date = apiM.utcDate // update local cache
+              log.push(`  DATE M${dbRow.match_number}: ${apiM.utcDate} (teams TBD: "${apiM.homeTeam.name}" vs "${apiM.awayTeam.name}")`)
+              teamsUpdated++ // count date seedings
+            }
+          }
+          continue
+        }
+
+        // Teams ARE known in API for this round — pair by date order
+        // Filter to only API matches where both teams map
+        const apiWithTeams = apiForRound.filter(m => mapTeam(m.homeTeam.name) && mapTeam(m.awayTeam.name))
+        const dbNeedingTeams = dbForRound.filter(r => !r.home_team)
+
+        log.push(
+          `  [SEED] ${apiWithTeams.length} API with real teams, ` +
+          `${dbNeedingTeams.length} DB needing teams`
+        )
+
+        // Match API (sorted by date) to DB rows (sorted by position)
+        // This assumes position ordering aligns with schedule order within the round.
+        const limit = Math.min(apiWithTeams.length, dbNeedingTeams.length)
+        for (let i = 0; i < limit; i++) {
+          const apiM   = apiWithTeams[i]
+          const dbRow  = dbNeedingTeams[i]
+          const homeHe = mapTeam(apiM.homeTeam.name)!
+          const awayHe = mapTeam(apiM.awayTeam.name)!
+
+          const patch: Record<string, unknown> = {
+            home_team:  homeHe,
+            away_team:  awayHe,
+            match_date: apiM.utcDate,
+            status:     'upcoming',
+          }
+          const { error } = await supabase
+            .from('knockout_bracket_matches')
+            .update(patch)
+            .eq('id', dbRow.id as string)
+          if (error) {
+            errors++
+            log.push(`  ERR seed M${dbRow.match_number}: ${error.message}`)
+          } else {
+            dbRow.home_team  = homeHe
+            dbRow.away_team  = awayHe
+            dbRow.match_date = apiM.utcDate
+            dbRow.status     = 'upcoming'
+            log.push(`  SEEDED M${dbRow.match_number} (pos ${dbRow.position}): ${homeHe} vs ${awayHe}`)
+            teamsUpdated++
+          }
+        }
+      }
+    }
+
+    // ── Per-match processing: update dates, handle results ────────
     for (const m of koMatches) {
       const homeRaw = m.homeTeam.name
       const awayRaw = m.awayTeam.name
       const homeHe  = mapTeam(homeRaw)
       const awayHe  = mapTeam(awayRaw)
 
-      // Try to find the DB row by team names (both orders) or by date proximity
+      // Find DB row — only match on real (non-null) values
       let dbRow: Record<string, unknown> | null = null
 
-      // Primary: match by Hebrew team names across all DB rows
-      for (const row of Object.values(dbByNum)) {
-        if (
-          (row.home_team === homeHe && row.away_team === awayHe) ||
-          (row.home_team === awayHe && row.away_team === homeHe)
-        ) {
-          dbRow = row
-          break
+      // Strategy 1: match by Hebrew team names (both are non-null and match DB)
+      if (homeHe && awayHe) {
+        for (const row of Object.values(dbByNum)) {
+          if (!row.home_team || !row.away_team) continue // skip rows with no teams yet
+          if (
+            (row.home_team === homeHe && row.away_team === awayHe) ||
+            (row.home_team === awayHe && row.away_team === homeHe)
+          ) {
+            dbRow = row
+            break
+          }
         }
       }
 
-      // Secondary: if teams not yet in DB (null), match by date ±3h within same round
-      if (!dbRow && homeHe && awayHe) {
+      // Strategy 2: by date ±3h within same round (DB already has match_date)
+      if (!dbRow && m.utcDate) {
         const dbRound = STAGE_MAP[m.stage]
         const apiTime = new Date(m.utcDate).getTime()
         for (const row of Object.values(dbByNum)) {
           if (row.round !== dbRound) continue
-          if (row.home_team || row.away_team) continue // already has teams
           if (!row.match_date) continue
           const diff = Math.abs(new Date(row.match_date as string).getTime() - apiTime)
           if (diff < 3 * 3_600_000) { dbRow = row; break }
@@ -191,58 +306,29 @@ Deno.serve(async () => {
       }
 
       if (!dbRow) {
-        log.push(`  NO_DB_MATCH: ${homeRaw} vs ${awayRaw} (${m.stage} ${m.utcDate})`)
+        // Only log if teams are real (don't flood log with TBD entries)
+        if (homeHe || awayHe) {
+          log.push(`  NO_DB_MATCH: "${homeRaw}" vs "${awayRaw}" (${m.stage} ${m.utcDate})`)
+        }
         continue
       }
 
       const dbId = dbRow.id as string
       const mn   = dbRow.match_number as number
 
-      // ── Populate team names + date if missing ─────────────────
-      if (homeHe && awayHe) {
-        const needsTeams = !dbRow.home_team || !dbRow.away_team
-        const needsDate  = !dbRow.match_date
-
-        if (needsTeams || needsDate) {
-          const patch: Record<string, unknown> = {}
-          if (needsTeams) {
-            // Respect home/away ordering from API if DB has no teams
-            if (!dbRow.home_team && !dbRow.away_team) {
-              patch.home_team = homeHe
-              patch.away_team = awayHe
-            } else if (!dbRow.home_team) {
-              patch.home_team = homeHe
-            } else if (!dbRow.away_team) {
-              patch.away_team = awayHe
-            }
-            // Status: upcoming if both teams known
-            const newHome = (patch.home_team ?? dbRow.home_team) as string | null
-            const newAway = (patch.away_team ?? dbRow.away_team) as string | null
-            if (newHome && newAway && dbRow.status === 'pending') {
-              patch.status = 'upcoming'
-            }
-          }
-          if (needsDate) {
-            patch.match_date = m.utcDate
-          }
-          if (Object.keys(patch).length > 0) {
-            const { error } = await supabase
-              .from('knockout_bracket_matches')
-              .update(patch)
-              .eq('id', dbId)
-            if (error) { log.push(`  ERR update teams M${mn}: ${error.message}`); errors++; continue }
-            log.push(`  TEAMS M${mn}: ${homeHe} vs ${awayHe}`)
-            teamsUpdated++
-            // Refresh local row for result processing below
-            dbRow = { ...dbRow, ...patch }
-          }
-        }
+      // Update date if API has it and DB doesn't
+      if (m.utcDate && !dbRow.match_date) {
+        await supabase
+          .from('knockout_bracket_matches')
+          .update({ match_date: m.utcDate })
+          .eq('id', dbId)
+        dbRow.match_date = m.utcDate
       }
 
-      // ── Set result for finished matches ────────────────────────
+      // ── Result grading for finished matches ────────────────────
       if (m.status === 'FINISHED' && dbRow.status !== 'finished') {
         const apiWinner = m.score.winner
-        if (!apiWinner || apiWinner === null) continue
+        if (!apiWinner) continue
 
         const result: 'home' | 'away' = apiWinner === 'HOME_TEAM' ? 'home' : 'away'
         const homeScore = m.score.fullTime.home
@@ -256,11 +342,10 @@ Deno.serve(async () => {
           : (dbRow.home_team as string)
 
         if (!winnerTeam) {
-          log.push(`  SKIP M${mn}: result known but winner team name missing`)
+          log.push(`  SKIP M${mn}: finished but winner team name missing in DB`)
           continue
         }
 
-        // Mark match finished
         await supabase
           .from('knockout_bracket_matches')
           .update({ result, status: 'finished', home_score: homeScore, away_score: awayScore })
@@ -268,38 +353,34 @@ Deno.serve(async () => {
 
         // Grade predictions
         const pts = ROUND_PTS[dbRow.round as string] ?? 2
-        await supabase
-          .from('knockout_predictions')
+        await supabase.from('knockout_predictions')
           .update({ is_graded: true, points_earned: 0 })
           .eq('bracket_match_id', dbId)
           .neq('predicted_winner', winnerTeam)
-
-        await supabase
-          .from('knockout_predictions')
+        await supabase.from('knockout_predictions')
           .update({ is_graded: true, points_earned: pts })
           .eq('bracket_match_id', dbId)
           .eq('predicted_winner', winnerTeam)
 
-        // Recalculate total_points for affected users (using RPC)
-        const { data: affectedUsers } = await supabase
+        // Recalculate total_points for affected users
+        const { data: affected } = await supabase
           .from('knockout_predictions')
           .select('user_id')
           .eq('bracket_match_id', dbId)
-
-        for (const { user_id } of affectedUsers ?? []) {
-          const [betsRes, gpRes, kpRes] = await Promise.all([
+        for (const { user_id } of affected ?? []) {
+          const [b, gp, kp] = await Promise.all([
             supabase.from('bets').select('points_earned').eq('user_id', user_id),
             supabase.from('group_predictions').select('points_earned').eq('user_id', user_id),
             supabase.from('knockout_predictions').select('points_earned').eq('user_id', user_id),
           ])
           const total =
-            (betsRes.data ?? []).reduce((s, r) => s + (r.points_earned ?? 0), 0) +
-            (gpRes.data  ?? []).reduce((s, r) => s + (r.points_earned ?? 0), 0) +
-            (kpRes.data  ?? []).reduce((s, r) => s + (r.points_earned ?? 0), 0)
+            (b.data  ?? []).reduce((s, r) => s + (r.points_earned ?? 0), 0) +
+            (gp.data ?? []).reduce((s, r) => s + (r.points_earned ?? 0), 0) +
+            (kp.data ?? []).reduce((s, r) => s + (r.points_earned ?? 0), 0)
           await supabase.from('users').update({ total_points: total }).eq('id', user_id)
         }
 
-        // Auto-advance winner to next match slot
+        // Auto-advance winner to next round
         const adv = ADVANCE[mn]
         if (adv && winnerTeam) {
           const { data: nextMatch } = await supabase
@@ -307,16 +388,10 @@ Deno.serve(async () => {
             .select('id, home_team, away_team, status')
             .eq('match_number', adv.toMatch)
             .maybeSingle()
-
           if (nextMatch) {
             const patch: Record<string, unknown> = {}
-            if (adv.slot === 'home') {
-              patch.home_team = winnerTeam
-              if (nextMatch.away_team) patch.status = 'upcoming'
-            } else {
-              patch.away_team = winnerTeam
-              if (nextMatch.home_team) patch.status = 'upcoming'
-            }
+            if (adv.slot === 'home') { patch.home_team = winnerTeam; if (nextMatch.away_team) patch.status = 'upcoming' }
+            else                     { patch.away_team = winnerTeam; if (nextMatch.home_team) patch.status = 'upcoming' }
             await supabase.from('knockout_bracket_matches').update(patch).eq('id', nextMatch.id)
             log.push(`  ADVANCE M${mn}→M${adv.toMatch}(${adv.slot}): ${winnerTeam}`)
           }
@@ -324,22 +399,16 @@ Deno.serve(async () => {
 
         // SF losers → M103 third-place
         if ((mn === 101 || mn === 102) && loserTeam) {
-          const { data: tpMatch } = await supabase
+          const { data: tp } = await supabase
             .from('knockout_bracket_matches')
             .select('id, home_team, away_team')
             .eq('match_number', 103)
             .maybeSingle()
-
-          if (tpMatch) {
+          if (tp) {
             const tpPatch: Record<string, unknown> = {}
-            if (mn === 101) {
-              tpPatch.home_team = loserTeam
-              if (tpMatch.away_team) tpPatch.status = 'upcoming'
-            } else {
-              tpPatch.away_team = loserTeam
-              if (tpMatch.home_team) tpPatch.status = 'upcoming'
-            }
-            await supabase.from('knockout_bracket_matches').update(tpPatch).eq('id', tpMatch.id)
+            if (mn === 101) { tpPatch.home_team = loserTeam; if (tp.away_team) tpPatch.status = 'upcoming' }
+            else            { tpPatch.away_team = loserTeam; if (tp.home_team) tpPatch.status = 'upcoming' }
+            await supabase.from('knockout_bracket_matches').update(tpPatch).eq('id', tp.id)
             log.push(`  LOSER M${mn}→M103: ${loserTeam}`)
           }
         }
@@ -349,13 +418,15 @@ Deno.serve(async () => {
       }
     }
 
-    log.push(`Done — teams:${teamsUpdated} results:${resultsSet} errors:${errors}`)
+    log.push(`Done: teams/dates=${teamsUpdated} results=${resultsSet} errors=${errors}`)
+
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     log.push(`FATAL: ${msg}`)
-    return new Response(JSON.stringify({ success: false, error: msg, log }), {
-      status: 500, headers: { 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ success: false, error: msg, log }, null, 2),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    )
   }
 
   return new Response(
