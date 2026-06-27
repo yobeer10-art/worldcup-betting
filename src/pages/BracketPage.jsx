@@ -6,21 +6,21 @@ import Header from '../components/Layout/Header'
 import KnockoutMatchCard from '../components/Bracket/KnockoutMatchCard'
 import Spinner from '../components/UI/Spinner'
 
-// ── Phase B unlocks after group stage ends (June 28, 2026 00:00 UTC)
+// Phase B page unlocks after group stage ends (June 28, 2026 00:00 UTC)
 const BRACKET_UNLOCK = new Date('2026-06-28T00:00:00Z')
 function isBracketUnlocked() { return new Date() >= BRACKET_UNLOCK }
 
-// ── Round display config ──────────────────────────────────────
+// Round display config (used in UI)
 const ROUNDS = [
-  { id: 'round_of_32', label: 'שלב 32',        icon: '⚔️',  pts: 1  },
-  { id: 'round_of_16', label: 'שמינית גמר',    icon: '🥊',  pts: 2  },
-  { id: 'quarter',     label: 'רבע גמר',        icon: '🔥',  pts: 4  },
-  { id: 'semi',        label: 'חצי גמר',        icon: '⚡',  pts: 8  },
-  { id: 'third_place', label: 'מקום שלישי',     icon: '🥉',  pts: 4  },
-  { id: 'final',       label: 'גמר',            icon: '🏆',  pts: 16 },
+  { id: 'round_of_32', label: 'שלב 32',      icon: '⚔️',  pts: 2  },
+  { id: 'round_of_16', label: 'שמינית גמר',  icon: '🥊',  pts: 3  },
+  { id: 'quarter',     label: 'רבע גמר',      icon: '🔥',  pts: 5  },
+  { id: 'semi',        label: 'חצי גמר',      icon: '⚡',  pts: 8  },
+  { id: 'third_place', label: 'מקום שלישי',   icon: '🥉',  pts: 3  },
+  { id: 'final',       label: 'גמר',          icon: '🏆',  pts: 12 },
 ]
 
-// ── Countdown component ───────────────────────────────────────
+// Countdown to bracket unlock
 function Countdown() {
   const [now, setNow] = useState(new Date())
   useEffect(() => {
@@ -36,7 +36,8 @@ function Countdown() {
 
   const Digit = ({ n, label }) => (
     <div className="flex flex-col items-center gap-1">
-      <div className="bg-slate-900 text-white text-2xl font-extrabold w-16 h-16 rounded-2xl flex items-center justify-center tabular-nums shadow-lg">
+      <div className="bg-slate-900 text-white text-2xl font-extrabold w-16 h-16
+                      rounded-2xl flex items-center justify-center tabular-nums shadow-lg">
         {String(n).padStart(2, '0')}
       </div>
       <span className="text-xs text-slate-400 font-medium">{label}</span>
@@ -56,17 +57,16 @@ function Countdown() {
   )
 }
 
-// ── Round section ─────────────────────────────────────────────
-function RoundSection({ round, matches, predictions, onSaved }) {
-  const cfg   = ROUNDS.find(r => r.id === round)
-  const total = matches.length
-  const userPredicted = predictions ? Object.keys(predictions).length : 0
-  const finished  = matches.filter(m => m.status === 'finished').length
+// Round section
+function RoundSection({ round, matches, predictions, locked, onSaved }) {
+  const cfg        = ROUNDS.find(r => r.id === round)
+  const total      = matches.length
+  const finished   = matches.filter(m => m.status === 'finished').length
   const teamsKnown = matches.filter(m => m.home_team && m.away_team).length
+  const userPicked = predictions ? Object.keys(predictions).length : 0
 
   return (
     <div>
-      {/* Round header */}
       <div className="flex items-center gap-3 mb-3">
         <span className="text-2xl">{cfg?.icon}</span>
         <div>
@@ -77,17 +77,20 @@ function RoundSection({ round, matches, predictions, onSaved }) {
           </p>
         </div>
         {teamsKnown < total && (
-          <span className="mr-auto text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full font-medium">
+          <span className="mr-auto text-xs bg-slate-100 text-slate-500
+                           px-2.5 py-1 rounded-full font-medium">
             {teamsKnown}/{total} קבוצות ידועות
           </span>
         )}
-        {teamsKnown === total && userPredicted < total && (
-          <span className="mr-auto text-xs bg-blue-50 text-blue-600 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">
-            ניחשת {userPredicted}/{total}
+        {teamsKnown === total && userPicked < total && !locked && (
+          <span className="mr-auto text-xs bg-blue-50 text-blue-600 border border-blue-200
+                           px-2.5 py-1 rounded-full font-semibold">
+            ניחשת {userPicked}/{total}
           </span>
         )}
         {finished === total && total > 0 && (
-          <span className="mr-auto text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-semibold">
+          <span className="mr-auto text-xs bg-emerald-100 text-emerald-700
+                           px-2.5 py-1 rounded-full font-semibold">
             ✅ הסתיים
           </span>
         )}
@@ -99,6 +102,7 @@ function RoundSection({ round, matches, predictions, onSaved }) {
             key={m.id}
             match={m}
             prediction={predictions?.[m.id] ?? null}
+            locked={locked}
             onSaved={onSaved}
           />
         ))}
@@ -112,13 +116,22 @@ function RoundSection({ round, matches, predictions, onSaved }) {
   )
 }
 
-// ── Main page ─────────────────────────────────────────────────
+// ── Main page ─────────────────────────────────────────────────────
 export default function BracketPage() {
   const { user }       = useAuth()
   const [bracketMatches, setBracketMatches] = useState([])
-  const [predictions,    setPredictions]    = useState({}) // { matchId: row }
+  const [predictions,    setPredictions]    = useState({})
   const [loading,        setLoading]        = useState(true)
-  const [unlocked]       = useState(isBracketUnlocked)
+  const [unlocked,       setUnlocked]       = useState(isBracketUnlocked)
+
+  // Auto-unlock when countdown expires (for users who leave the tab open)
+  useEffect(() => {
+    if (unlocked) return
+    const diff = BRACKET_UNLOCK.getTime() - Date.now()
+    if (diff <= 0) { setUnlocked(true); return }
+    const t = setTimeout(() => setUnlocked(true), diff)
+    return () => clearTimeout(t)
+  }, [unlocked])
 
   const fetchData = useCallback(async () => {
     const [matchRes, predRes] = await Promise.all([
@@ -131,17 +144,34 @@ export default function BracketPage() {
         ? supabase.from('knockout_predictions').select('*').eq('user_id', user.id)
         : Promise.resolve({ data: [] }),
     ])
-
     setBracketMatches(matchRes.data ?? [])
-
     const map = {}
     predRes.data?.forEach(p => { map[p.bracket_match_id] = p })
     setPredictions(map)
-
     setLoading(false)
   }, [user])
 
-  useEffect(() => { if (unlocked) { fetchData() } else { setLoading(false) } }, [fetchData, unlocked])
+  useEffect(() => {
+    if (unlocked) fetchData()
+    else setLoading(false)
+  }, [fetchData, unlocked])
+
+  // ── Global bracket betting lock ───────────────────────────────
+  // Locks 5 minutes before the earliest R32 match with a known date.
+  const [nowMs, setNowMs] = useState(Date.now)
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+
+  const firstR32Time = bracketMatches
+    .filter(m => m.round === 'round_of_32' && m.match_date)
+    .reduce((min, m) => {
+      const t = new Date(m.match_date).getTime()
+      return t < min ? t : min
+    }, Infinity)
+
+  const isBracketLocked = firstR32Time < Infinity && nowMs >= firstR32Time - 5 * 60 * 1000
 
   // Group matches by round
   const byRound = {}
@@ -151,9 +181,7 @@ export default function BracketPage() {
   }
 
   // Points summary
-  const totalPoints = Object.values(predictions).reduce(
-    (sum, p) => sum + (p.points_earned ?? 0), 0
-  )
+  const totalPoints  = Object.values(predictions).reduce((s, p) => s + (p.points_earned ?? 0), 0)
   const correctPicks = Object.values(predictions).filter(p => p.is_graded && p.points_earned > 0).length
 
   return (
@@ -166,29 +194,35 @@ export default function BracketPage() {
           <span className="text-3xl">🎯</span>
           <div>
             <h1 className="text-2xl font-extrabold text-slate-800 leading-none">ברקט הנוקאאוט</h1>
-            <p className="text-slate-400 text-xs mt-0.5">
-              שלב 32 → גמר · מונדיאל 2026
-            </p>
+            <p className="text-slate-400 text-xs mt-0.5">שלב 32 → גמר · מונדיאל 2026</p>
           </div>
         </div>
 
-        {/* Bracket header */}
+        {/* Header card */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white shadow-xl">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-lg shadow-md">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600
+                            rounded-xl flex items-center justify-center text-lg shadow-md">
               🎯
             </div>
             <div>
               <h2 className="font-extrabold text-base">מדרגי הנוקאאוט</h2>
               <p className="text-slate-400 text-xs">
-                נפתח לאחר סיום שלב הבתים (28 ביוני 2026)
+                {unlocked
+                  ? isBracketLocked
+                    ? 'ההימורים נעולים — צפה בתוצאות'
+                    : 'נחש מי יעלה בכל שלב'
+                  : 'נפתח לאחר סיום שלב הבתים (28 ביוני 2026)'}
               </p>
             </div>
             <span className={`mr-auto text-xs font-bold px-2.5 py-1 rounded-full ${
-              unlocked ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                       : 'bg-white/10 text-slate-400 border border-white/10'
+              !unlocked
+                ? 'bg-white/10 text-slate-400 border border-white/10'
+                : isBracketLocked
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
             }`}>
-              {unlocked ? '✅ פתוח' : '🔒 נעול'}
+              {!unlocked ? '🔒 נעול' : isBracketLocked ? '🔒 הימורים נעולו' : '✅ פתוח להימורים'}
             </span>
           </div>
 
@@ -203,14 +237,12 @@ export default function BracketPage() {
           </div>
         </div>
 
-        {/* Countdown (if locked) */}
+        {/* Countdown (locked / pre-unlock) */}
         {!unlocked && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-center space-y-4">
             <div className="text-4xl">⏳</div>
             <div>
-              <h3 className="font-extrabold text-slate-800 text-lg mb-1">
-                המדרגי נפתח בעוד:
-              </h3>
+              <h3 className="font-extrabold text-slate-800 text-lg mb-1">המדרגי נפתח בעוד:</h3>
               <p className="text-xs text-slate-400">28 ביוני 2026 · לאחר סיום כל משחקי שלב הבתים</p>
             </div>
             <Countdown />
@@ -222,15 +254,29 @@ export default function BracketPage() {
           </div>
         )}
 
-        {/* Bracket content (when unlocked) */}
+        {/* Locked banner */}
+        {unlocked && isBracketLocked && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 flex items-center gap-3">
+            <span className="text-2xl">🔒</span>
+            <div>
+              <p className="font-extrabold text-amber-800 text-sm">ההימורים נעולו</p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                ניתן לצפות בתוצאות ובנקודות בלבד — לא ניתן לשנות ניחושים
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Bracket content */}
         {unlocked && (
           <>
             {/* User stats */}
             {user && correctPicks > 0 && (
-              <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-2xl px-5 py-3 flex items-center justify-between">
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200
+                              rounded-2xl px-5 py-3 flex items-center justify-between">
                 <div>
                   <p className="font-extrabold text-emerald-800 text-sm">
-                    🏆 ניחוש מדרגי נכונים: {correctPicks}
+                    🏆 ניחושים נכונים: {correctPicks}
                   </p>
                   <p className="text-xs text-emerald-600 mt-0.5">
                     {totalPoints} נקודות מהמדרגי עד כה
@@ -246,7 +292,7 @@ export default function BracketPage() {
                 <div className="text-5xl">⏳</div>
                 <p className="text-slate-500 font-semibold">המדרגי עדיין לא הוגדר</p>
                 <p className="text-sm text-slate-400">
-                  המנהל יגדיר את המשחקים לאחר סיום שלב הבתים
+                  יתעדכן אוטומטית לאחר סיום שלב הבתים
                 </p>
               </div>
             ) : (
@@ -260,6 +306,7 @@ export default function BracketPage() {
                       round={id}
                       matches={matches}
                       predictions={predictions}
+                      locked={isBracketLocked}
                       onSaved={fetchData}
                     />
                   )

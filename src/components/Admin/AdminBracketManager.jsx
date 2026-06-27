@@ -146,7 +146,12 @@ function BracketMatchRow({ match, onRefresh }) {
   return (
     <div className="border border-slate-200 rounded-2xl bg-white p-3 space-y-2">
       <div className="flex items-center justify-between text-xs text-slate-400">
-        <span className="font-semibold text-slate-600">{roundLabel} #{match.position}</span>
+        <span className="font-semibold text-slate-600">
+          {roundLabel} #{match.position}
+          {match.match_number && (
+            <span className="ml-1 text-slate-400 font-normal">(M{match.match_number})</span>
+          )}
+        </span>
         <span className={`px-2 py-0.5 rounded-full font-semibold ${
           match.status === 'finished' ? 'bg-emerald-100 text-emerald-700'
           : match.status === 'live'   ? 'bg-red-100 text-red-600'
@@ -295,9 +300,10 @@ function ChampionGrader() {
 
 /* ── Main ──────────────────────────────────────────────────── */
 export default function AdminBracketManager() {
-  const [matches, setMatches] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter,  setFilter]  = useState('all')
+  const [matches,     setMatches]     = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [filter,      setFilter]      = useState('all')
+  const [showAddForm, setShowAddForm] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -316,7 +322,20 @@ export default function AdminBracketManager() {
   return (
     <div className="space-y-4">
       <ChampionGrader />
-      <AddMatchForm onAdded={load} />
+
+      {/* Add-match form — hidden by default since 32 rows are pre-seeded */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-500">
+          {matches.length} משחקים ב-DB (צפוי: 32)
+        </p>
+        <button
+          onClick={() => setShowAddForm(o => !o)}
+          className="text-xs text-slate-400 hover:text-slate-600 underline"
+        >
+          {showAddForm ? '▲ הסתר טופס הוספה' : '▼ הוסף משחק ידנית'}
+        </button>
+      </div>
+      {showAddForm && <AddMatchForm onAdded={load} />}
 
       {/* Round filter */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
