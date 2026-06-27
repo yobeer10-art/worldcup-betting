@@ -1,26 +1,38 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
 import FlagImg from '../UI/FlagImg'
 
-// locked = true when the global bracket betting window is closed
-export default function KnockoutMatchCard({ match, prediction, onSaved, locked = false }) {
+// Props:
+//   match        — raw DB row (id, match_number, match_date, status, result, home/away_score)
+//   homeTeam     — resolved team name (may come from user's upstream pick)
+//   awayTeam     — resolved team name
+//   homePredicted — true when homeTeam comes from user's upstream prediction, not confirmed data
+//   awayPredicted — true when awayTeam comes from user's upstream prediction
+//   homeSource   — placeholder label when homeTeam is null ("מנצח M73")
+//   awaySource   — placeholder label when awayTeam is null
+//   prediction   — user's knockout_predictions row for this match (or null)
+//   onPick(team) — called when user picks a winner; parent handles DB + cascade
+export default function KnockoutMatchCard({
+  match,
+  homeTeam, awayTeam,
+  homePredicted = false, awayPredicted = false,
+  homeSource, awaySource,
+  prediction,
+  onPick,
+}) {
   const { user } = useAuth()
-  const [saving,    setSaving]    = useState(false)
-  const [err,       setErr]       = useState(null)
   const [justSaved, setJustSaved] = useState(false)
 
-  // Auto-lock 5 min before kickoff (if match_date is known)
+  // Per-match auto-lock: 5 min before this match's own kickoff
   const [now, setNow] = useState(Date.now)
   const timerRef = useRef(null)
   useEffect(() => {
     if (!match.match_date) return
     const kickoff = new Date(match.match_date).getTime()
-    const update = () => setNow(Date.now())
+    const update  = () => setNow(Date.now)
     const remaining = kickoff - Date.now()
     if (remaining > 0) {
-      const interval = remaining < 3_600_000 ? 10_000 : 60_000
-      timerRef.current = setInterval(update, interval)
+      timerRef.current = setInterval(update, remaining < 3_600_000 ? 10_000 : 60_000)
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [match.match_date])
@@ -29,29 +41,23 @@ export default function KnockoutMatchCard({ match, prediction, onSaved, locked =
   const minsToKickoff = kickoffMs ? Math.floor((kickoffMs - now) / 60_000) : null
   const autoLocked    = kickoffMs !== null && minsToKickoff !== null && minsToKickoff <= 5
 
-  const teamsKnown = match.home_team && match.away_team
   const isFinished = match.status === 'finished'
-  const canPredict = user && teamsKnown && !isFinished && !locked && !autoLocked
-
   const winner = isFinished
-    ? (match.result === 'home' ? match.home_team : match.away_team)
+    ? (match.result === 'home' ? homeTeam : awayTeam)
     : null
 
-  async function pick(team) {
-    if (!canPredict || saving) return
-    setSaving(true); setErr(null)
-    const { error } = await supabase.from('knockout_predictions').upsert(
-      { user_id: user.id, bracket_match_id: match.id, predicted_winner: team },
-      { onConflict: 'user_id,bracket_match_id' },
-    )
-    setSaving(false)
-    if (error) { setErr(error.message); return }
+  // Can pick if both teams are known (real or predicted), not finished, not locked
+  const canPredict = !!(user && homeTeam && awayTeam && !isFinished && !autoLocked)
+
+  function pick(team) {
+    if (!canPredict) return
+    onPick?.(team)
     setJustSaved(true)
     setTimeout(() => setJustSaved(false), 1500)
-    onSaved?.()
   }
 
-  function TeamButton({ team, source }) {
+  function TeamButton({ team, source, isPresumed }) {
+    // isPresumed: team shown here comes from user's upstream pick, not confirmed
     if (!team) return (
       <div className="flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-2xl
                       bg-slate-50 border border-dashed border-slate-200">
@@ -71,24 +77,33 @@ export default function KnockoutMatchCard({ match, prediction, onSaved, locked =
     return (
       <button
         onClick={() => pick(team)}
-        disabled={!canPredict || saving}
-        className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl border-2
+        disabled={!canPredict}
+        className={`flex-1 flex flex-col items-center gap-1.5 py-3 px-2 rounded-2xl
           transition-all duration-200 active:scale-95
-          ${correct  ? 'border-emerald-400 bg-emerald-50 shadow-md shadow-emerald-200/60'
-            : wrong  ? 'border-rose-300 bg-rose-50 opacity-70'
-            : isLoser  ? 'border-transparent bg-slate-50 opacity-50'
-            : isWinner ? 'border-amber-400 bg-amber-50 shadow-md'
-            : picked   ? 'border-blue-400 bg-blue-50 shadow-md shadow-blue-200/50'
-            : canPredict ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'
-            : 'border-slate-100 bg-white'
-          }
-          ${saving ? 'cursor-wait' : ''}
-        `}
+          border-2
+          ${correct    ? 'border-emerald-400 bg-emerald-50 shadow-md shadow-emerald-200/60'
+          : wrong      ? 'border-rose-300 bg-rose-50 opacity-70'
+          : isLoser    ? 'border-transparent bg-slate-50 opacity-50'
+          : isWinner   ? 'border-amber-400 bg-amber-50 shadow-md'
+          : picked && isPresumed
+                       ? 'border-blue-300 border-dashed bg-blue-50 shadow-sm'
+          : picked     ? 'border-blue-400 bg-blue-50 shadow-md shadow-blue-200/50'
+          : canPredict && isPresumed
+                       ? 'border-slate-200 border-dashed bg-white/80 hover:border-blue-300 hover:bg-blue-50'
+          : canPredict ? 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+          : isPresumed ? 'border-slate-100 border-dashed bg-white/80'
+          :              'border-slate-100 bg-white'
+          }`}
       >
         <FlagImg team={team} size="md" />
-        <span className="text-xs font-bold text-slate-700 text-center leading-tight line-clamp-2">
+        <span className={`text-xs font-bold text-center leading-tight line-clamp-2 ${
+          isPresumed && !picked && !isFinished ? 'text-slate-400' : 'text-slate-700'
+        }`}>
           {team}
         </span>
+        {isPresumed && !isFinished && !picked && (
+          <span className="text-[9px] text-slate-400 italic">ניחוש שלב קודם</span>
+        )}
         {correct  && <span className="text-[10px] font-bold text-emerald-600">✅ ניחשת!</span>}
         {wrong    && <span className="text-[10px] font-bold text-rose-500">❌</span>}
         {isWinner && !picked && <span className="text-[10px] font-bold text-amber-600">🏆 ניצח</span>}
@@ -103,9 +118,9 @@ export default function KnockoutMatchCard({ match, prediction, onSaved, locked =
     <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-all ${
       isFinished ? 'border-slate-200' : 'border-slate-200 hover:border-blue-200'
     }`}>
-      {/* Top strip */}
+      {/* Top colour strip */}
       <div className={`h-1 w-full ${
-        isFinished     ? 'bg-slate-300'
+        isFinished              ? 'bg-slate-300'
         : match.status === 'live' ? 'bg-gradient-to-r from-red-400 to-rose-500'
         : 'bg-gradient-to-r from-blue-400 to-indigo-500'
       }`} />
@@ -122,13 +137,11 @@ export default function KnockoutMatchCard({ match, prediction, onSaved, locked =
             {match.match_date && (
               <span className="text-[11px] text-slate-400 truncate">
                 {new Date(match.match_date).toLocaleDateString('he-IL', {
-                  timeZone: 'Asia/Jerusalem',
-                  day: 'numeric', month: 'short',
+                  timeZone: 'Asia/Jerusalem', day: 'numeric', month: 'short',
                 })}
                 {' '}
                 {new Date(match.match_date).toLocaleTimeString('he-IL', {
-                  timeZone: 'Asia/Jerusalem',
-                  hour: '2-digit', minute: '2-digit',
+                  timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit',
                 })}
               </span>
             )}
@@ -141,43 +154,35 @@ export default function KnockoutMatchCard({ match, prediction, onSaved, locked =
           )}
 
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-            isFinished          ? 'bg-slate-100 text-slate-500'
-            : match.status === 'live'  ? 'bg-red-100 text-red-600'
-            : locked || autoLocked ? 'bg-amber-100 text-amber-600'
-            : teamsKnown        ? 'bg-blue-50 text-blue-600'
+            isFinished              ? 'bg-slate-100 text-slate-500'
+            : match.status === 'live' ? 'bg-red-100 text-red-600'
+            : autoLocked            ? 'bg-amber-100 text-amber-600'
+            : homeTeam && awayTeam  ? 'bg-blue-50 text-blue-600'
             : 'bg-slate-100 text-slate-400'
           }`}>
-            {isFinished           ? 'הסתיים'
+            {isFinished              ? 'הסתיים'
              : match.status === 'live' ? '🔴 חי'
-             : locked             ? '🔒 נעול'
-             : autoLocked         ? `🔒 ${minsToKickoff}ד׳`
-             : teamsKnown         ? 'קרוב'
+             : autoLocked             ? `🔒 ${minsToKickoff}ד׳`
+             : homeTeam && awayTeam   ? 'פתוח'
              : 'טרם נקבע'}
           </span>
         </div>
 
         {/* Teams */}
         <div className="flex gap-2">
-          <TeamButton team={match.home_team} source={match.home_source} />
-          <div className="flex items-center text-slate-300 font-black text-sm flex-shrink-0 mt-1">
-            vs
-          </div>
-          <TeamButton team={match.away_team} source={match.away_source} />
+          <TeamButton team={homeTeam} source={homeSource} isPresumed={homePredicted} />
+          <div className="flex items-center text-slate-300 font-black text-sm flex-shrink-0 mt-1">vs</div>
+          <TeamButton team={awayTeam} source={awaySource} isPresumed={awayPredicted} />
         </div>
 
-        {err && <p className="text-xs text-red-500 mt-2 text-center">{err}</p>}
         {justSaved && (
-          <p className="text-xs text-emerald-600 font-semibold mt-2 text-center animate-pulse">
-            ✅ נשמר!
-          </p>
+          <p className="text-xs text-emerald-600 font-semibold mt-2 text-center animate-pulse">✅ נשמר!</p>
         )}
-        {!user && teamsKnown && !isFinished && !locked && !autoLocked && (
+        {!user && homeTeam && awayTeam && !isFinished && !autoLocked && (
           <p className="text-[11px] text-slate-400 text-center mt-2">
             <a href="/auth" className="text-blue-500 underline">התחבר</a> כדי לנחש
           </p>
         )}
-
-        {/* Points earned */}
         {isFinished && prediction?.is_graded && (
           <div className={`mt-2 text-center text-xs font-bold ${
             prediction.points_earned > 0 ? 'text-emerald-600' : 'text-rose-500'
