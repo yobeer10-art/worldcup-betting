@@ -19,6 +19,7 @@ export default function KnockoutMatchCard({
   homeSource, awaySource,
   prediction,
   onPick,
+  locked = false,
 }) {
   const { user } = useAuth()
   const [justSaved, setJustSaved] = useState(false)
@@ -47,7 +48,7 @@ export default function KnockoutMatchCard({
     : null
 
   // Can pick if both teams are known (real or predicted), not finished, not locked
-  const canPredict = !!(user && homeTeam && awayTeam && !isFinished && !autoLocked)
+  const canPredict = !!(user && homeTeam && awayTeam && !isFinished && !autoLocked && !locked)
 
   function pick(team) {
     if (!canPredict) return
@@ -156,12 +157,14 @@ export default function KnockoutMatchCard({
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
             isFinished              ? 'bg-slate-100 text-slate-500'
             : match.status === 'live' ? 'bg-red-100 text-red-600'
+            : locked                ? 'bg-rose-50 text-rose-500'
             : autoLocked            ? 'bg-amber-100 text-amber-600'
             : homeTeam && awayTeam  ? 'bg-blue-50 text-blue-600'
             : 'bg-slate-100 text-slate-400'
           }`}>
             {isFinished              ? 'הסתיים'
              : match.status === 'live' ? '🔴 חי'
+             : locked                 ? '🔒 ננעל'
              : autoLocked             ? `🔒 ${minsToKickoff}ד׳`
              : homeTeam && awayTeam   ? 'פתוח'
              : 'טרם נקבע'}

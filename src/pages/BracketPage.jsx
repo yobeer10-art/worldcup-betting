@@ -8,6 +8,11 @@ import KnockoutMatchCard from '../components/Bracket/KnockoutMatchCard'
 import BracketExportCanvas from '../components/Bracket/BracketExportCanvas'
 import Spinner from '../components/UI/Spinner'
 
+// ── Global bracket lock ────────────────────────────────────────────────────
+// Set to true once all users have submitted their bracket (before R32 begins).
+// When locked, bracket picks are read-only for everyone; picks cannot be added or changed.
+const BRACKET_LOCKED = true
+
 // ── Round config ───────────────────────────────────────────────────────────
 const ROUNDS = [
   { id: 'round_of_32', label: 'שלב 32',     icon: '⚔️', pts: 2  },
@@ -104,7 +109,7 @@ export default function BracketPage() {
 
   // ── Pick handler with cascade-invalidation ────────────────────────────
   async function handlePick(matchNum, teamName) {
-    if (!user) return
+    if (!user || BRACKET_LOCKED) return
     const match = matchByNum[matchNum]
     if (!match) return
 
@@ -232,7 +237,7 @@ export default function BracketPage() {
   const correctPicks = Object.values(predictions).filter(p => p.is_graded && p.points_earned > 0).length
 
   // Render one card, computing effective teams from the user's flow-forward picks
-  function renderCard(m) {
+  function renderCard(m, extraProps = {}) {
     const mn  = m.match_number
     const src = FEED_SOURCE[mn]
 
@@ -259,6 +264,8 @@ export default function BracketPage() {
         awaySource={awaySrc}
         prediction={predictions[m.id] ?? null}
         onPick={(team) => handlePick(mn, team)}
+        locked={BRACKET_LOCKED}
+        {...extraProps}
       />
     )
   }
@@ -288,6 +295,18 @@ export default function BracketPage() {
             </button>
           )}
         </div>
+
+        {BRACKET_LOCKED && (
+          <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3">
+            <span className="text-2xl">🔒</span>
+            <div>
+              <p className="font-extrabold text-rose-700 text-sm">הברקט ננעל</p>
+              <p className="text-xs text-rose-500 mt-0.5">
+                ניתן לצפות בניחושים — לא ניתן לשנות. הנקודות יתעדכנו עם כל תוצאה.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white shadow-xl">
           <div className="flex items-center gap-3 mb-4">
