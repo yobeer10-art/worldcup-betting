@@ -108,7 +108,9 @@ export default function BracketPage() {
     const match = matchByNum[matchNum]
     if (!match) return
 
-    // Simulate new predByNum with this pick
+    // Snapshot pre-update state so the DB write uses the correct existing ids
+    const predBefore   = predictions[match.id]   // may have .id if already in DB
+    const clearBefore  = {}
     const newPbn = { ...predByNum, [matchNum]: teamName }
 
     // Walk downstream; clear any pick whose team is no longer in the effective lineup
@@ -122,10 +124,12 @@ export default function BracketPage() {
       if (existingPick !== h?.team && existingPick !== a?.team) {
         toClear.push(dn)
         delete newPbn[dn]
+        const cm = matchByNum[dn]
+        if (cm) clearBefore[dn] = predictions[cm.id]   // snapshot before optimistic clear
       }
     }
 
-    // Optimistic local state update
+    // Optimistic local state update (instant UI response)
     const newPredictions = { ...predictions }
     newPredictions[match.id] = {
       ...(predictions[match.id] ?? {}),
@@ -139,20 +143,54 @@ export default function BracketPage() {
     }
     setPredictions(newPredictions)
 
-    // Persist to DB (fire-and-forget; no full reload needed)
-    supabase.from('knockout_predictions').upsert(
-      { user_id: user.id, bracket_match_id: match.id, predicted_winner: teamName },
-      { onConflict: 'user_id,bracket_match_id' },
-    )
-    for (const mn of toClear) {
-      const m = matchByNum[mn]
-      if (m) {
-        supabase.from('knockout_predictions')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('bracket_match_id', m.id)
+    // ── Persist to DB ────────────────────────────────────────────────
+    // Use INSERT-or-UPDATE keyed by the row's own `id` so we don't need
+    // a UNIQUE constraint.  The upsert(onConflict) pattern requires one and
+    // fails silently (PostgreSQL error 42P10) when it doesn't exist.
+    ;(async () => {
+      try {
+        if (predBefore?.id) {
+          // Row already exists in DB → UPDATE it
+          const { error } = await supabase
+            .from('knockout_predictions')
+            .update({ predicted_winner: teamName })
+            .eq('id', predBefore.id)
+          if (error) throw error
+        } else {
+          // New prediction → INSERT and capture the returned id
+          const { data, error } = await supabase
+            .from('knockout_predictions')
+            .insert({ user_id: user.id, bracket_match_id: match.id, predicted_winner: teamName })
+            .select('id')
+            .single()
+          if (error) throw error
+          // Store the DB-assigned id so the next change on this match uses UPDATE
+          if (data?.id) {
+            setPredictions(prev => ({
+              ...prev,
+              [match.id]: { ...(prev[match.id] ?? {}), id: data.id },
+            }))
+          }
+        }
+
+        // Delete cleared downstream predictions
+        for (const mn of toClear) {
+          const m = matchByNum[mn]
+          if (!m) continue
+          const pred = clearBefore[mn]
+          if (pred?.id) {
+            const { error } = await supabase
+              .from('knockout_predictions')
+              .delete()
+              .eq('id', pred.id)
+            if (error) console.error('[bracket] delete cleared pick failed:', error)
+          }
+        }
+      } catch (err) {
+        console.error('[bracket] save pick failed — reverting to DB state:', err)
+        fetchData()   // revert optimistic state
       }
-    }
+    })()
   }
 
   // ── Download bracket image ────────────────────────────────────────────
