@@ -1,108 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import html2canvas from 'html2canvas'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+import { FEED_SOURCE, ADVANCE, LOSER_TO, getDownstreamOf, getEff } from '../lib/bracketUtils'
 import Header from '../components/Layout/Header'
 import KnockoutMatchCard from '../components/Bracket/KnockoutMatchCard'
+import BracketExportCanvas from '../components/Bracket/BracketExportCanvas'
 import Spinner from '../components/UI/Spinner'
-
-// ── Bracket feed-forward maps ──────────────────────────────────────────────
-// For each match slot, which match's outcome (winner/loser) fills it?
-const FEED_SOURCE = {
-   89: { home: { m:  74 }, away: { m:  77 } },
-   90: { home: { m:  73 }, away: { m:  75 } },
-   91: { home: { m:  76 }, away: { m:  78 } },
-   92: { home: { m:  79 }, away: { m:  80 } },
-   93: { home: { m:  83 }, away: { m:  84 } },
-   94: { home: { m:  81 }, away: { m:  82 } },
-   95: { home: { m:  86 }, away: { m:  88 } },
-   96: { home: { m:  85 }, away: { m:  87 } },
-   97: { home: { m:  89 }, away: { m:  90 } },
-   98: { home: { m:  93 }, away: { m:  94 } },
-   99: { home: { m:  91 }, away: { m:  92 } },
-  100: { home: { m:  95 }, away: { m:  96 } },
-  101: { home: { m:  97 }, away: { m:  98 } },
-  102: { home: { m:  99 }, away: { m: 100 } },
-  103: { home: { m: 101, loser: true }, away: { m: 102, loser: true } },
-  104: { home: { m: 101 }, away: { m: 102 } },
-}
-
-// Winner advance path (for cascade-invalidation traversal)
-const ADVANCE = {
-   73: { to:  90 },  74: { to:  89 },  75: { to:  90 },  76: { to:  91 },
-   77: { to:  89 },  78: { to:  91 },  79: { to:  92 },  80: { to:  92 },
-   81: { to:  94 },  82: { to:  94 },  83: { to:  93 },  84: { to:  93 },
-   85: { to:  96 },  86: { to:  95 },  87: { to:  96 },  88: { to:  95 },
-   89: { to:  97 },  90: { to:  97 },  91: { to:  99 },  92: { to:  99 },
-   93: { to:  98 },  94: { to:  98 },  95: { to: 100 },  96: { to: 100 },
-   97: { to: 101 },  98: { to: 101 },  99: { to: 102 }, 100: { to: 102 },
-  101: { to: 104 }, 102: { to: 104 },
-}
-
-// SF losers also feed third-place
-const LOSER_TO = { 101: 103, 102: 103 }
-
-// All downstream match numbers reachable from matchNum (via winner and loser paths)
-function getDownstreamOf(mn) {
-  const seen = new Set()
-  const queue = [mn]
-  while (queue.length) {
-    const cur = queue.shift()
-    if (ADVANCE[cur] && !seen.has(ADVANCE[cur].to)) {
-      seen.add(ADVANCE[cur].to)
-      queue.push(ADVANCE[cur].to)
-    }
-    if (LOSER_TO[cur] && !seen.has(LOSER_TO[cur])) {
-      seen.add(LOSER_TO[cur])
-      // M103 feeds nowhere further
-    }
-  }
-  return [...seen]
-}
-
-// Pure: resolve the effective team for one slot given current predByNum.
-// Returns { team: string, predicted: boolean } or null.
-// `predicted: true` means the team comes from the user's own upstream pick,
-// not from confirmed DB data — rendered with lighter/dashed style.
-function getEff(mn, slot, matchByNum, predByNum) {
-  const match = matchByNum[mn]
-  if (!match) return null
-
-  // Real confirmed team from DB (seeded from group results or real match result)
-  const real = slot === 'home' ? match.home_team : match.away_team
-  if (real) return { team: real, predicted: false }
-
-  const src = FEED_SOURCE[mn]?.[slot]
-  if (!src) return null
-
-  const feedMatch = matchByNum[src.m]
-  if (!feedMatch) return null
-
-  if (src.loser) {
-    // M103 slots: loser of M101 / M102
-    if (feedMatch.status === 'finished' && feedMatch.result) {
-      const lt = feedMatch.result === 'home' ? feedMatch.away_team : feedMatch.home_team
-      return lt ? { team: lt, predicted: false } : null
-    }
-    const pick = predByNum[src.m]
-    if (pick) {
-      const h = getEff(src.m, 'home', matchByNum, predByNum)
-      const a = getEff(src.m, 'away', matchByNum, predByNum)
-      if (h && a) {
-        const loser = pick === h.team ? a.team : h.team
-        return { team: loser, predicted: true }
-      }
-    }
-    return null
-  } else {
-    // Winner path
-    if (feedMatch.status === 'finished' && feedMatch.result) {
-      const wt = feedMatch.result === 'home' ? feedMatch.home_team : feedMatch.away_team
-      return wt ? { team: wt, predicted: false } : null
-    }
-    const pick = predByNum[src.m]
-    return pick ? { team: pick, predicted: true } : null
-  }
-}
 
 // ── Round config ───────────────────────────────────────────────────────────
 const ROUNDS = [
@@ -151,10 +55,12 @@ function RoundSection({ round, matches, renderCard }) {
 
 // ── Main page ──────────────────────────────────────────────────────────────
 export default function BracketPage() {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [bracketMatches, setBracketMatches] = useState([])
   const [predictions,    setPredictions]    = useState({})  // keyed by bracket_match_id
   const [loading,        setLoading]        = useState(true)
+  const [downloading,    setDownloading]    = useState(false)
+  const exportRef = useRef(null)
 
   const fetchData = useCallback(async () => {
     const [matchRes, predRes] = await Promise.all([
@@ -249,6 +155,34 @@ export default function BracketPage() {
     }
   }
 
+  // ── Download bracket image ────────────────────────────────────────────
+  async function downloadBracket() {
+    if (!exportRef.current || downloading) return
+    setDownloading(true)
+    try {
+      const canvas = await html2canvas(exportRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: null,
+        logging: false,
+      })
+      canvas.toBlob(blob => {
+        if (!blob) return
+        const url = URL.createObjectURL(blob)
+        const a   = document.createElement('a')
+        a.href     = url
+        a.download = `bracket-${(profile?.display_name ?? 'my')}-2026.png`
+        a.click()
+        setTimeout(() => URL.revokeObjectURL(url), 2000)
+      }, 'image/png')
+    } catch (err) {
+      console.error('bracket export failed:', err)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   // ── Group by round ────────────────────────────────────────────────────
   const byRound = {}
   for (const m of bracketMatches) {
@@ -298,10 +232,23 @@ export default function BracketPage() {
 
         <div className="flex items-center gap-3">
           <span className="text-3xl">🎯</span>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-extrabold text-slate-800 leading-none">ברקט הנוקאאוט</h1>
             <p className="text-slate-400 text-xs mt-0.5">שלב 32 → גמר · מונדיאל 2026</p>
           </div>
+          {user && (
+            <button
+              onClick={downloadBracket}
+              disabled={downloading || loading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold
+                         bg-emerald-600 text-white shadow-sm
+                         hover:bg-emerald-700 active:scale-95 transition-all
+                         disabled:opacity-50 disabled:cursor-wait"
+            >
+              {downloading ? '⏳' : '📸'}
+              <span className="hidden sm:inline">{downloading ? 'מייצר...' : 'הורד ברקט'}</span>
+            </button>
+          )}
         </div>
 
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white shadow-xl">
@@ -364,6 +311,15 @@ export default function BracketPage() {
         )}
 
       </main>
+
+      {/* Hidden export canvas — captured by html2canvas on download */}
+      <BracketExportCanvas
+        ref={exportRef}
+        bracketMatches={bracketMatches}
+        matchByNum={matchByNum}
+        predByNum={predByNum}
+        userName={profile?.display_name ?? user?.email?.split('@')[0] ?? 'שחקן'}
+      />
     </>
   )
 }
