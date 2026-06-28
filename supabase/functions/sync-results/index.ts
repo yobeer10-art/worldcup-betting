@@ -124,6 +124,8 @@ function mapTeam(name: string): string | null {
   return TEAM_MAP[name] ?? null
 }
 
+const KO_STAGES = new Set(['round_of_32','round_of_16','quarter','semi','third_place','final'])
+
 interface ApiMatch {
   id:       number
   utcDate:  string
@@ -131,8 +133,9 @@ interface ApiMatch {
   homeTeam: { name: string; shortName?: string }
   awayTeam: { name: string; shortName?: string }
   score: {
-    winner:   'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null
-    fullTime: { home: number | null; away: number | null }
+    winner:      'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null
+    fullTime:    { home: number | null; away: number | null }
+    regularTime: { home: number | null; away: number | null }
   }
 }
 
@@ -204,7 +207,7 @@ Deno.serve(async () => {
 
       const { data: dbMatch, error: findErr } = await supabase
         .from('matches')
-        .select('id, status, home_team, away_team')
+        .select('id, status, stage, home_team, away_team')
         .eq('home_team', homeHe)
         .eq('away_team', awayHe)
         .gte('match_date', dateMin)
@@ -247,36 +250,65 @@ Deno.serve(async () => {
         continue
       }
 
-      // ── Grade bets: 3-tier scoring ─────────────────────────────────
-      // Wrong result → 0 pts
-      await supabase
-        .from('bets')
-        .update({ is_correct: false, points_earned: 0 })
-        .eq('match_id', dbMatch.id)
-        .neq('prediction', result)
+      // ── Grade bets ─────────────────────────────────────────────────
+      const isKnockout = KO_STAGES.has(dbMatch.stage)
 
-      // Correct result — check score individually for bonus
-      const { data: correctBets } = await supabase
-        .from('bets')
-        .select('id, predicted_home_score, predicted_away_score')
-        .eq('match_id', dbMatch.id)
-        .eq('prediction', result)
+      if (isKnockout) {
+        // ── Knockout: Bet1=advance pick (2pts), Bet2=exact 90-min score (3pts) ──
+        // Bet1 winner = final winner including ET + penalties (score.winner from API)
+        const winnerTeam = result === 'home' ? dbMatch.home_team : dbMatch.away_team
 
-      for (const bet of correctBets ?? []) {
-        const exactMatch =
-          homeScore !== null &&
-          bet.predicted_home_score !== null &&
-          bet.predicted_home_score === homeScore &&
-          bet.predicted_away_score === awayScore
+        // Bet2 score = regularTime (score after 90 min, can be a draw like 1-1)
+        const rtHome = m.score.regularTime?.home
+        const rtAway = m.score.regularTime?.away
 
+        const { data: allBets } = await supabase
+          .from('bets')
+          .select('id, advance_pick, predicted_home_score, predicted_away_score')
+          .eq('match_id', dbMatch.id)
+
+        for (const bet of allBets ?? []) {
+          const advanceCorrect = !!bet.advance_pick && bet.advance_pick === winnerTeam
+          const advPts = advanceCorrect ? 2 : 0
+
+          const scoreCorrect =
+            rtHome !== null && rtAway !== null &&
+            bet.predicted_home_score !== null && bet.predicted_away_score !== null &&
+            bet.predicted_home_score === rtHome && bet.predicted_away_score === rtAway
+          const scorePts = scoreCorrect ? 3 : 0
+
+          await supabase.from('bets').update({
+            is_correct:     advanceCorrect,
+            advance_points: advPts,
+            points_earned:  advPts + scorePts,
+          }).eq('id', bet.id)
+        }
+      } else {
+        // ── Group stage: correct result = 1pt, exact fullTime score = 3pts ──
         await supabase
           .from('bets')
-          .update({
+          .update({ is_correct: false, points_earned: 0 })
+          .eq('match_id', dbMatch.id)
+          .neq('prediction', result)
+
+        const { data: correctBets } = await supabase
+          .from('bets')
+          .select('id, predicted_home_score, predicted_away_score')
+          .eq('match_id', dbMatch.id)
+          .eq('prediction', result)
+
+        for (const bet of correctBets ?? []) {
+          const exactMatch =
+            homeScore !== null &&
+            bet.predicted_home_score !== null &&
+            bet.predicted_home_score === homeScore &&
+            bet.predicted_away_score === awayScore
+
+          await supabase.from('bets').update({
             is_correct:    true,
             points_earned: exactMatch ? 3 : 1,
-          })
-          .eq('id', bet.id)
-        // on_bet_graded trigger recalculates user total_points
+          }).eq('id', bet.id)
+        }
       }
 
       updatedCount++
