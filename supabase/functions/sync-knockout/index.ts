@@ -148,11 +148,13 @@ Deno.serve(async () => {
     const koMatches = allMatches.filter(m => STAGE_MAP[m.stage])
     log.push(`API: ${allMatches.length} total, ${koMatches.length} knockout`)
 
-    // ── Debug: dump first 5 knockout matches raw ─────────────────
-    for (const m of koMatches.slice(0, 5)) {
+    // ── Dump ALL R32 matches from API ────────────────────────────
+    const r32Api = koMatches.filter(m => STAGE_MAP[m.stage] === 'round_of_32')
+    log.push(`  [R32 API] ${r32Api.length} matches:`)
+    for (const m of r32Api.sort((a, b) => new Date(a.utcDate).getTime() - new Date(b.utcDate).getTime())) {
       log.push(
-        `  [RAW] ${m.stage} | ${m.utcDate} | ` +
-        `home="${m.homeTeam.name}" away="${m.awayTeam.name}" | status=${m.status}`
+        `    id=${m.id} | ${m.utcDate} | ` +
+        `"${m.homeTeam.name}" vs "${m.awayTeam.name}" | ${m.status}`
       )
     }
 
@@ -225,18 +227,36 @@ Deno.serve(async () => {
           continue
         }
 
-        // Teams ARE known in API for this round — pair by date order
-        // Filter to only API matches where both teams map
-        const apiWithTeams = apiForRound.filter(m => mapTeam(m.homeTeam.name) && mapTeam(m.awayTeam.name))
+        // Teams ARE known in API for this round — pair NEW (unplaced) matches only.
+        // Build a set of team-pairs already present in the DB for this round,
+        // so we never re-seed a match that's already correctly placed.
+        const alreadyPlaced = new Set<string>()
+        for (const row of Object.values(dbByNum)) {
+          if (row.round !== dbRound || !row.home_team || !row.away_team) continue
+          alreadyPlaced.add(`${row.home_team}|${row.away_team}`)
+          alreadyPlaced.add(`${row.away_team}|${row.home_team}`)
+        }
+
+        const apiWithTeams = apiForRound.filter(m => {
+          const h = mapTeam(m.homeTeam.name)
+          const a = mapTeam(m.awayTeam.name)
+          if (!h || !a) return false
+          // Skip if this team-pair is already correctly placed in another DB row
+          if (alreadyPlaced.has(`${h}|${a}`)) {
+            log.push(`  [SKIP already placed] "${m.homeTeam.name}" vs "${m.awayTeam.name}"`)
+            return false
+          }
+          return true
+        })
+
         const dbNeedingTeams = dbForRound.filter(r => !r.home_team)
 
         log.push(
-          `  [SEED] ${apiWithTeams.length} API with real teams, ` +
-          `${dbNeedingTeams.length} DB needing teams`
+          `  [SEED] ${apiWithTeams.length} unplaced API matches, ` +
+          `${dbNeedingTeams.length} DB rows need teams`
         )
 
-        // Match API (sorted by date) to DB rows (sorted by position)
-        // This assumes position ordering aligns with schedule order within the round.
+        // Pair unplaced API matches (sorted by date) with empty DB rows (sorted by position).
         const limit = Math.min(apiWithTeams.length, dbNeedingTeams.length)
         for (let i = 0; i < limit; i++) {
           const apiM   = apiWithTeams[i]
