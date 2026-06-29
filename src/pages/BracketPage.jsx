@@ -10,8 +10,14 @@ import Spinner from '../components/UI/Spinner'
 
 // ── Global bracket lock ────────────────────────────────────────────────────
 // Set to true once all users have submitted their bracket (before R32 begins).
-// When locked, bracket picks are read-only for everyone; picks cannot be added or changed.
+// When locked, bracket picks are read-only for everyone except users in BRACKET_UNLOCK_IDS.
 const BRACKET_LOCKED = true
+
+// Temporary exceptions: user_ids allowed to edit even while BRACKET_LOCKED = true.
+// Remove an id from this set to re-lock that user. Clear the set to lock everyone.
+const BRACKET_UNLOCK_IDS = new Set([
+  'a229def0-48c4-450b-8a1b-dd9a5000928a', // Ori — bracket lost due to save bug, reopened temporarily
+])
 
 // ── Round config ───────────────────────────────────────────────────────────
 const ROUNDS = [
@@ -67,6 +73,9 @@ export default function BracketPage() {
   const [downloading,    setDownloading]    = useState(false)
   const exportRef = useRef(null)
 
+  // Effective lock: global lock minus personal exception
+  const isLocked = BRACKET_LOCKED && !BRACKET_UNLOCK_IDS.has(user?.id ?? '')
+
   const fetchData = useCallback(async () => {
     const [matchRes, predRes] = await Promise.all([
       supabase
@@ -109,7 +118,7 @@ export default function BracketPage() {
 
   // ── Pick handler with cascade-invalidation ────────────────────────────
   async function handlePick(matchNum, teamName) {
-    if (!user || BRACKET_LOCKED) return
+    if (!user || isLocked) return
     const match = matchByNum[matchNum]
     if (!match) return
 
@@ -264,7 +273,7 @@ export default function BracketPage() {
         awaySource={awaySrc}
         prediction={predictions[m.id] ?? null}
         onPick={(team) => handlePick(mn, team)}
-        locked={BRACKET_LOCKED}
+        locked={isLocked}
         {...extraProps}
       />
     )
@@ -296,13 +305,24 @@ export default function BracketPage() {
           )}
         </div>
 
-        {BRACKET_LOCKED && (
+        {isLocked && (
           <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3">
             <span className="text-2xl">🔒</span>
             <div>
               <p className="font-extrabold text-rose-700 text-sm">הברקט ננעל</p>
               <p className="text-xs text-rose-500 mt-0.5">
                 ניתן לצפות בניחושים — לא ניתן לשנות. הנקודות יתעדכנו עם כל תוצאה.
+              </p>
+            </div>
+          </div>
+        )}
+        {BRACKET_LOCKED && !isLocked && (
+          <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+            <span className="text-2xl">✏️</span>
+            <div>
+              <p className="font-extrabold text-amber-700 text-sm">גישה מיוחדת — מלא את הברקט שלך</p>
+              <p className="text-xs text-amber-600 mt-0.5">
+                הברקט נעול לשאר המשתתפים. יש לך גישה זמנית למלא את הניחושים.
               </p>
             </div>
           </div>
