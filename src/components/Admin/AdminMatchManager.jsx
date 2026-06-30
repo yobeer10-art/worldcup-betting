@@ -41,20 +41,23 @@ function getMatchday(iso) {
 
 const FILTERS = ['הכל', 'קרוב', 'חי', 'הסתיים', 'MD1', 'MD2', 'MD3']
 const GROUP_NAMES = ['א','ב','ג','ד','ה','ו','ז','ח','ט','י','יא','יב']
+const KO_STAGES = new Set(['round_of_32','round_of_16','quarter','semi','third_place','final'])
 
 // ── EditRow — inline result form ──────────────────────────────────
 function EditRow({ match, onSave, onCancel }) {
+  const isKo = KO_STAGES.has(match.stage)
   const [homeScore, setHomeScore] = useState(match.home_score ?? '')
   const [awayScore, setAwayScore] = useState(match.away_score ?? '')
   const [result,    setResult]    = useState(match.result ?? '')
   const [saving,    setSaving]    = useState(false)
   const [err,       setErr]       = useState(null)
 
-  // Auto-infer result from scores
+  // Auto-infer result from scores — for group stage only (KO never has a draw)
   useEffect(() => {
+    if (isKo) return
     const inferred = inferResult(homeScore, awayScore)
     if (inferred) setResult(inferred)
-  }, [homeScore, awayScore])
+  }, [homeScore, awayScore, isKo])
 
   async function handleSave() {
     if (!result) { setErr('בחר תוצאה'); return }
@@ -75,6 +78,13 @@ function EditRow({ match, onSave, onCancel }) {
         ✏️ קביעת תוצאה
       </p>
 
+      {/* KO warning */}
+      {isKo && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-800 text-center font-medium">
+          ⚠️ משחק נוקאאוט — הזן תוצאת <strong>90 דקות</strong> בלבד, ובחר את המנצח הסופי (כולל הארכות/פנדלים)
+        </div>
+      )}
+
       {/* Score inputs */}
       <div className="flex items-center gap-3 justify-center">
         <div className="text-center">
@@ -85,6 +95,7 @@ function EditRow({ match, onSave, onCancel }) {
             onChange={e => setHomeScore(e.target.value)}
             className="w-16 text-center text-2xl font-bold border-2 border-emerald-300 rounded-xl p-2 focus:outline-none focus:border-emerald-500"
           />
+          {isKo && <div className="text-[9px] text-amber-600 mt-0.5">90 דקות</div>}
         </div>
         <span className="text-2xl text-slate-400 font-bold mt-5">—</span>
         <div className="text-center">
@@ -95,12 +106,15 @@ function EditRow({ match, onSave, onCancel }) {
             onChange={e => setAwayScore(e.target.value)}
             className="w-16 text-center text-2xl font-bold border-2 border-emerald-300 rounded-xl p-2 focus:outline-none focus:border-emerald-500"
           />
+          {isKo && <div className="text-[9px] text-amber-600 mt-0.5">90 דקות</div>}
         </div>
       </div>
 
-      {/* Result radio */}
+      {/* Result radio — KO: no draw option */}
       <div className="flex gap-2 justify-center">
-        {Object.entries(RESULT_CFG).map(([key, cfg]) => (
+        {Object.entries(RESULT_CFG)
+          .filter(([key]) => !isKo || key !== 'draw')
+          .map(([key, cfg]) => (
           <button
             key={key}
             onClick={() => setResult(key)}
@@ -110,7 +124,7 @@ function EditRow({ match, onSave, onCancel }) {
                 : 'border-transparent bg-white/60 text-slate-500 hover:border-slate-300'
             }`}
           >
-            {cfg.icon} {cfg.label}
+            {cfg.icon} {isKo && key !== 'draw' ? (key === 'home' ? `מנצח: ${match.home_team}` : `מנצח: ${match.away_team}`) : cfg.label}
           </button>
         ))}
       </div>
