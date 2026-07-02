@@ -85,7 +85,7 @@ export default function HomePage() {
           : Promise.resolve({ data: [] }),
         supabase.from('users').select('id', { count: 'exact', head: true }),
         user && ids.length
-          ? supabase.from('bets').select('*').eq('user_id', user.id).in('match_id', ids)
+          ? supabase.from('bets').select('match_id').eq('user_id', user.id).in('match_id', ids)
           : Promise.resolve({ data: [] }),
         user
           ? supabase.from('users').select('id', { count: 'exact', head: true })
@@ -166,6 +166,52 @@ export default function HomePage() {
             </Link>
           </div>
         )}
+
+        {/* ── Smart next-bet nudge ──────────────────────────── */}
+        {user && !loading && (() => {
+          const now = Date.now()
+          const nextUnbet = matches.find(m =>
+            m.status === 'upcoming' &&
+            !userBets[m.id] &&
+            new Date(m.match_date).getTime() - now > 5 * 60_000 &&
+            !m.is_locked
+          )
+          if (!nextUnbet) {
+            const hasBettable = matches.some(m => m.status === 'upcoming')
+            if (!hasBettable) return null
+            return (
+              <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3">
+                <span className="text-xl">✅</span>
+                <p className="text-sm font-bold text-emerald-700">כל ההימורים לסבב הזה הוגשו!</p>
+              </div>
+            )
+          }
+          const minsLeft = Math.floor((new Date(nextUnbet.match_date).getTime() - now) / 60_000)
+          const urgent = minsLeft <= 30
+          return (
+            <Link
+              to="/matches"
+              className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all shadow-sm ${
+                urgent
+                  ? 'bg-rose-50 border-rose-200 hover:border-rose-300'
+                  : 'bg-amber-50 border-amber-200 hover:border-amber-300'
+              }`}
+            >
+              <span className="text-2xl flex-shrink-0">{urgent ? '🔥' : '⚽'}</span>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-extrabold ${urgent ? 'text-rose-700' : 'text-amber-700'}`}>
+                  {urgent ? `נסגר בעוד ${minsLeft} דקות!` : 'עוד לא הימרת'}
+                </p>
+                <p className="text-sm font-bold text-slate-800 truncate">
+                  {nextUnbet.home_team} נגד {nextUnbet.away_team}
+                </p>
+              </div>
+              <span className={`text-xs font-bold flex-shrink-0 ${urgent ? 'text-rose-500' : 'text-amber-500'}`}>
+                הימר ←
+              </span>
+            </Link>
+          )
+        })()}
 
         {/* ── Today's / next matches ──────────────────────────── */}
         <section>

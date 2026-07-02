@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link }               from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth }            from '../context/AuthContext'
 import { supabase }           from '../lib/supabase'
 import { isPredictionLocked, PREDICTION_DEADLINE } from '../lib/groups'
@@ -42,6 +42,10 @@ const PRED_ICON  = { home: '🏠',  draw: '🤝',   away: '✈️'   }
 /* ═══════════════════════════════════════════════════════════════ */
 export default function MyBetsPage() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const [activeView, setActiveView] = useState(
+    searchParams.get('v') === 'digest' ? 'digest' : 'my'
+  )
 
   /* ── State ──────────────────────────────────────────────────── */
   const [allMatches,  setAllMatches]  = useState([])
@@ -217,12 +221,33 @@ export default function MyBetsPage() {
       <Header />
       <main className="max-w-lg mx-auto px-4 pt-5 pb-28 space-y-5" dir="rtl">
 
-        {/* ══ PAGE TITLE ══════════════════════════════════════════ */}
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-800">📋 ההימורים שלי</h1>
-          <p className="text-slate-400 text-xs mt-0.5">כל הניחושים שלך במקום אחד</p>
+        {/* ══ VIEW TOGGLE ═════════════════════════════════════════ */}
+        <div className="flex gap-2 bg-slate-100 rounded-2xl p-1">
+          <button
+            onClick={() => setActiveView('my')}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeView === 'my'
+                ? 'bg-white shadow text-emerald-600'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            📋 ההימורים שלי
+          </button>
+          <button
+            onClick={() => setActiveView('digest')}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+              activeView === 'digest'
+                ? 'bg-white shadow text-sky-600'
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            👥 ריכוז
+          </button>
         </div>
 
+        {activeView === 'digest' && <DigestInline />}
+
+        {activeView === 'my' && <>
         {/* ══ SUMMARY CARD ════════════════════════════════════════ */}
         <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600
                         rounded-2xl p-4 text-white shadow-md">
@@ -540,9 +565,250 @@ export default function MyBetsPage() {
             </Link>
           </div>
         )}
+        </>}
 
       </main>
     </>
+  )
+}
+
+/* ── Digest inline view ───────────────────────────────────────── */
+function israelToday_d() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+}
+function israelDate_d(iso) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+}
+function israelTime_d(iso) {
+  return new Date(iso).toLocaleTimeString('he-IL', {
+    timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+}
+function hebrewDayLabel_d(dateStr) {
+  return new Date(`${dateStr}T12:00:00+03:00`).toLocaleDateString('he-IL', {
+    timeZone: 'Asia/Jerusalem', weekday: 'long', day: 'numeric', month: 'long',
+  })
+}
+function addDays_d(dateStr, n) {
+  const d = new Date(`${dateStr}T12:00:00+03:00`)
+  d.setDate(d.getDate() + n)
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
+}
+const DIGEST_PICK = {
+  home: { label: 'בית',  icon: '🏠', bg: 'bg-sky-100 text-sky-700 border-sky-200' },
+  draw: { label: 'תיקו', icon: '🤝', bg: 'bg-amber-100 text-amber-700 border-amber-200' },
+  away: { label: 'אורח', icon: '✈️', bg: 'bg-violet-100 text-violet-700 border-violet-200' },
+}
+const DIGEST_AVATAR_COLORS = [
+  'bg-emerald-500','bg-sky-500','bg-violet-500','bg-rose-500',
+  'bg-amber-500','bg-teal-500','bg-indigo-500','bg-pink-500',
+]
+function digestAvatarColor(uid) {
+  let h = 0
+  for (let i = 0; i < (uid?.length ?? 0); i++) h = (h * 31 + uid.charCodeAt(i)) & 0xffffffff
+  return DIGEST_AVATAR_COLORS[Math.abs(h) % DIGEST_AVATAR_COLORS.length]
+}
+function digestInitials(name) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  return parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2)
+}
+
+function DigestBetRow({ bet, isFinished }) {
+  const name = bet.users?.display_name ?? 'שחקן'
+  const pick = DIGEST_PICK[bet.prediction]
+  const hasScore = bet.predicted_home_score != null && bet.predicted_away_score != null
+  return (
+    <div className="flex items-center gap-2.5 py-2 border-b border-slate-50 last:border-0">
+      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-extrabold shrink-0 ${digestAvatarColor(bet.user_id)}`}>
+        {digestInitials(name)}
+      </div>
+      <span className="text-xs font-semibold text-slate-700 flex-1 min-w-0 truncate">{name}</span>
+      {hasScore && (
+        <span className="text-[10px] font-mono text-slate-400 shrink-0 tabular-nums">
+          {bet.predicted_home_score}–{bet.predicted_away_score}
+        </span>
+      )}
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${pick?.bg}`}>
+        {pick?.icon} {pick?.label}
+      </span>
+      {isFinished && (
+        <div className="shrink-0">
+          {bet.is_correct === true ? (
+            <span className={`text-[11px] font-extrabold ${(bet.points_earned ?? 0) >= 3 ? 'text-amber-500' : 'text-emerald-500'}`}>
+              {(bet.points_earned ?? 0) >= 3 ? '🌟' : '✅'} +{bet.points_earned}
+            </span>
+          ) : bet.is_correct === false ? (
+            <span className="text-[11px] text-rose-400 font-bold">❌ 0</span>
+          ) : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DigestMatchCard({ match, bets, isToday }) {
+  const isFinished = match.status === 'finished'
+  const [open, setOpen] = useState(true)
+  const sorted = [...bets].sort((a, b) => {
+    if (isFinished) return (b.points_earned ?? 0) - (a.points_earned ?? 0)
+    const order = { home: 0, draw: 1, away: 2 }
+    return (order[a.prediction] ?? 9) - (order[b.prediction] ?? 9)
+  })
+  return (
+    <div className={`bg-white rounded-2xl overflow-hidden shadow-sm ${isToday ? 'border-2 border-emerald-200' : 'border border-slate-200'}`}>
+      <div className={`h-1 ${isToday ? 'bg-gradient-to-r from-emerald-400 to-teal-400' : 'bg-gradient-to-r from-sky-300 to-indigo-300'}`} />
+      <div className="px-4 pt-3 pb-2.5 cursor-pointer select-none" onClick={() => setOpen(o => !o)}>
+        <div className="flex items-center justify-between gap-2 mb-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 tabular-nums">🕐 {israelTime_d(match.match_date)}</span>
+            {isFinished && <span className="text-[9px] font-bold bg-slate-700 text-white px-1.5 py-px rounded-full">הסתיים</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${bets.length > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+              {bets.length} הימורים
+            </span>
+            <span className="text-slate-300 text-xs">{open ? '▲' : '▼'}</span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+            <FlagImg team={match.home_team} size="md" />
+            <span className="text-xs font-bold text-slate-800 text-center leading-tight line-clamp-2">{match.home_team}</span>
+          </div>
+          <div className="flex flex-col items-center gap-0.5 shrink-0 px-2">
+            {isFinished && match.home_score != null ? (
+              <div className="bg-slate-900 text-white text-base font-black px-3 py-1.5 rounded-xl tabular-nums">
+                {match.home_score}–{match.away_score}
+              </div>
+            ) : (
+              <div className="text-slate-300 text-lg font-black">VS</div>
+            )}
+          </div>
+          <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+            <FlagImg team={match.away_team} size="md" />
+            <span className="text-xs font-bold text-slate-800 text-center leading-tight line-clamp-2">{match.away_team}</span>
+          </div>
+        </div>
+      </div>
+      {open && (
+        <div className="border-t border-slate-100 px-4">
+          {sorted.length === 0 ? (
+            <p className="text-center text-xs text-slate-400 py-4">אין הימורים עדיין</p>
+          ) : (
+            sorted.map(bet => <DigestBetRow key={bet.id} bet={bet} isFinished={isFinished} />)
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DigestInline() {
+  const [matches,     setMatches]     = useState([])
+  const [betsByMatch, setBetsByMatch] = useState({})
+  const [loading,     setLoading]     = useState(true)
+  const [pastOpen,    setPastOpen]    = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      const today      = israelToday_d()
+      const tomorrow   = addDays_d(today, 1)
+      const twoDaysAgo = addDays_d(today, -2)
+      const windowStart = new Date(`${twoDaysAgo}T00:00:00+03:00`).toISOString()
+      const windowEnd   = new Date(`${tomorrow}T23:59:59+03:00`).toISOString()
+      const { data: matchData } = await supabase
+        .from('matches').select('*')
+        .gte('match_date', windowStart).lte('match_date', windowEnd).order('match_date')
+      if (cancelled) return
+      const ms = matchData ?? []
+      setMatches(ms)
+      if (!ms.length) { setLoading(false); return }
+      const { data: betsData } = await supabase
+        .from('bets')
+        .select('id,match_id,prediction,predicted_home_score,predicted_away_score,is_correct,points_earned,user_id,users(display_name)')
+        .in('match_id', ms.map(m => m.id)).order('created_at', { ascending: true })
+      if (!cancelled) {
+        const bm = {}
+        for (const b of betsData ?? []) { if (!bm[b.match_id]) bm[b.match_id] = []; bm[b.match_id].push(b) }
+        setBetsByMatch(bm)
+        setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  const today      = israelToday_d()
+  const tomorrow   = addDays_d(today, 1)
+  const yesterday  = addDays_d(today, -1)
+  const twoDaysAgo = addDays_d(today, -2)
+  const todayMs    = matches.filter(m => israelDate_d(m.match_date) === today)
+  const tomorrowMs = matches.filter(m => israelDate_d(m.match_date) === tomorrow)
+  const pastMs     = matches.filter(m => { const d = israelDate_d(m.match_date); return d === yesterday || d === twoDaysAgo }).reverse()
+
+  if (loading) return <div className="flex justify-center py-10"><Spinner size="lg" /></div>
+  if (!matches.length) return (
+    <div className="text-center py-10 space-y-2">
+      <div className="text-4xl">⚽</div>
+      <p className="text-slate-500 text-sm">אין משחקים בטווח</p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {todayMs.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-emerald-200" />
+            <div className="flex items-center gap-1.5 bg-emerald-500 text-white text-xs font-extrabold px-3 py-1 rounded-full">
+              <span className="animate-pulse">🟢</span>
+              <span>היום · {hebrewDayLabel_d(today)}</span>
+            </div>
+            <div className="flex-1 h-px bg-emerald-200" />
+          </div>
+          {todayMs.map(m => <DigestMatchCard key={m.id} match={m} bets={betsByMatch[m.id] ?? []} isToday />)}
+        </section>
+      )}
+      {tomorrowMs.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-sky-200" />
+            <div className="flex items-center gap-1.5 bg-sky-500 text-white text-xs font-extrabold px-3 py-1 rounded-full">
+              <span>📅</span><span>מחר · {hebrewDayLabel_d(tomorrow)}</span>
+            </div>
+            <div className="flex-1 h-px bg-sky-200" />
+          </div>
+          {tomorrowMs.map(m => <DigestMatchCard key={m.id} match={m} bets={betsByMatch[m.id] ?? []} isToday={false} />)}
+        </section>
+      )}
+      {pastMs.length > 0 && (
+        <section className="space-y-3">
+          <button onClick={() => setPastOpen(o => !o)} className="w-full flex items-center gap-2 select-none">
+            <div className="flex-1 h-px bg-slate-200" />
+            <div className="flex items-center gap-1.5 bg-slate-500 text-white text-xs font-extrabold px-3 py-1 rounded-full">
+              <span>📁</span>
+              <span>ימים קודמים ({pastMs.length} משחקים)</span>
+              <span className="text-slate-300 text-[10px]">{pastOpen ? '▲' : '▼'}</span>
+            </div>
+            <div className="flex-1 h-px bg-slate-200" />
+          </button>
+          {pastOpen && [yesterday, twoDaysAgo].filter(d => pastMs.some(m => israelDate_d(m.match_date) === d)).map(day => (
+            <div key={day} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-slate-100" />
+                <span className="text-[10px] font-bold text-slate-400 px-2">{hebrewDayLabel_d(day)}</span>
+                <div className="flex-1 h-px bg-slate-100" />
+              </div>
+              {pastMs.filter(m => israelDate_d(m.match_date) === day).map(m =>
+                <DigestMatchCard key={m.id} match={m} bets={betsByMatch[m.id] ?? []} isToday={false} />
+              )}
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
   )
 }
 

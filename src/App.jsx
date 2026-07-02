@@ -35,7 +35,7 @@ export default function App() {
               <Route path="/auth"        element={<AuthPage />}        />
               <Route path="/admin"       element={<AdminPage />}       />
               <Route path="/mybets"     element={<MyBetsPage />}     />
-              <Route path="/digest"     element={<DigestPage />}     />
+              <Route path="/digest"     element={<Navigate to="/mybets?v=digest" replace />} />
 
               {/* ── Legacy redirects ─────────────────────── */}
               <Route path="/champion"      element={<Navigate to="/special" replace />} />

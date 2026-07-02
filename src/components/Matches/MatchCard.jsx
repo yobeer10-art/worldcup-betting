@@ -196,8 +196,17 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
 
   // Auto-lock 5 min before kickoff
   const isAutoLocked  = match.status === 'upcoming' && minsToKick > 0 && minsToKick <= 5
-  const isCountdown   = match.status === 'upcoming' && !match.is_locked && minsToKick > 5 && minsToKick <= 30
+  // Show countdown banner for matches within 60 min (urgent); compact pill shown for ≤24h in header
+  const isCountdown   = match.status === 'upcoming' && !match.is_locked && minsToKick > 5 && minsToKick <= 60
   const isBettingOpen = match.status === 'upcoming' && !match.is_locked && !isAutoLocked && msToKickoff > 0
+  // Compact countdown text for header pill (visible up to 24h)
+  const hoursToKick   = minsToKick / 60
+  const showHeaderCountdown = match.status === 'upcoming' && !match.is_locked && !isAutoLocked && minsToKick > 60 && hoursToKick <= 24
+  function countdownLabel(mins) {
+    if (mins < 60) return `${mins}ד׳`
+    const h = Math.floor(mins / 60), m = mins % 60
+    return m > 0 ? `${h}ש׳ ${m}ד׳` : `${h}ש׳`
+  }
   const isLocked      = match.is_locked || isAutoLocked || match.status !== 'upcoming'
   const isFinished    = match.status === 'finished'
 
@@ -355,7 +364,7 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
 
         {error && <p className="text-red-500 text-xs text-center">{error}</p>}
 
-        {pred && (
+        {pred && !justSaved && (
           <button
             onClick={saveBet}
             disabled={saving || saveBlocked}
@@ -363,9 +372,15 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
           >
             {saving
               ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> שומר...</>
-              : justSaved ? '✅ נשמר!'
               : '🎯 שמור ניחוש'}
           </button>
+        )}
+
+        {justSaved && (
+          <div className="w-full py-3 bg-emerald-50 border-2 border-emerald-300 rounded-2xl flex items-center justify-center gap-2">
+            <span className="text-2xl">✅</span>
+            <span className="text-emerald-700 font-extrabold text-sm">נשמר!</span>
+          </div>
         )}
 
         {!justSaved && userBet?.prediction && (
@@ -459,6 +474,11 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
             {(match.is_locked || isAutoLocked) && (
               <span className="text-[11px] bg-amber-100 text-amber-600 font-semibold px-2 py-0.5 rounded-full">🔒</span>
             )}
+            {showHeaderCountdown && (
+              <span className="text-[10px] bg-amber-50 text-amber-600 font-bold px-2 py-0.5 rounded-full border border-amber-200">
+                ⏰ {countdownLabel(minsToKick)}
+              </span>
+            )}
             <StatusBadge status={match.status} />
           </div>
         </div>
@@ -483,12 +503,14 @@ export default function MatchCard({ match, userBet, onBetPlaced, communityStats 
         </div>
       </div>
 
-      {/* ── Feature 1: Countdown / auto-lock banners ─────── */}
+      {/* ── Countdown / auto-lock banners ────────────────── */}
       {isCountdown && (
-        <div className="bg-amber-50 border-b border-amber-100 px-4 py-1.5 flex items-center gap-2">
-          <span className="text-amber-500 animate-pulse">⏰</span>
-          <span className="text-xs font-bold text-amber-700">
-            נסגר בעוד {minsToKick} {minsToKick === 1 ? 'דקה' : 'דקות'} — הזדרז לנחש!
+        <div className={`border-b px-4 py-1.5 flex items-center gap-2 ${
+          minsToKick <= 15 ? 'bg-rose-50 border-rose-100' : 'bg-amber-50 border-amber-100'
+        }`}>
+          <span className={`animate-pulse ${minsToKick <= 15 ? 'text-rose-500' : 'text-amber-500'}`}>⏰</span>
+          <span className={`text-xs font-bold ${minsToKick <= 15 ? 'text-rose-700' : 'text-amber-700'}`}>
+            נסגר בעוד {minsToKick} {minsToKick === 1 ? 'דקה' : 'דקות'}{minsToKick <= 15 ? ' — הזדרז!' : ''}
           </span>
         </div>
       )}
