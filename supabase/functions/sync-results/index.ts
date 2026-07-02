@@ -320,6 +320,12 @@ Deno.serve(async () => {
     // Deduplicate unmapped teams
     unmappedTeams = [...new Set(unmappedTeams)]
 
+    // Recalculate total_points for all users after grading
+    if (updatedCount > 0) {
+      await supabase.rpc('recalculate_all_user_points')
+      log.push('Recalculated total_points for all users')
+    }
+
     log.push(`Done: ${updatedCount} updated, ${skippedCount} already finished`)
     if (unmappedTeams.length)   log.push(`Unmapped teams: ${unmappedTeams.join(', ')}`)
     if (notFoundMatches.length) log.push(`Not found in DB: ${notFoundMatches.join(' | ')}`)

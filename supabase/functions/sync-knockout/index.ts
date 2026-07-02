@@ -323,24 +323,6 @@ Deno.serve(async () => {
           .eq('bracket_match_id', dbId)
           .eq('predicted_winner', winnerTeam)
 
-        // Recalculate total_points for affected users
-        const { data: affected } = await supabase
-          .from('knockout_predictions')
-          .select('user_id')
-          .eq('bracket_match_id', dbId)
-        for (const { user_id } of affected ?? []) {
-          const [b, gp, kp] = await Promise.all([
-            supabase.from('bets').select('points_earned').eq('user_id', user_id),
-            supabase.from('group_predictions').select('points_earned').eq('user_id', user_id),
-            supabase.from('knockout_predictions').select('points_earned').eq('user_id', user_id),
-          ])
-          const total =
-            (b.data  ?? []).reduce((s: number, r: {points_earned:number}) => s + (r.points_earned ?? 0), 0) +
-            (gp.data ?? []).reduce((s: number, r: {points_earned:number}) => s + (r.points_earned ?? 0), 0) +
-            (kp.data ?? []).reduce((s: number, r: {points_earned:number}) => s + (r.points_earned ?? 0), 0)
-          await supabase.from('users').update({ total_points: total }).eq('id', user_id)
-        }
-
         // Auto-advance winner to next round
         const adv = ADVANCE[mn]
         if (adv && winnerTeam) {
@@ -387,6 +369,12 @@ Deno.serve(async () => {
         log.push(`  RESULT M${mn}: ${winnerTeam} wins (${homeScore}–${awayScore})`)
         resultsSet++
       }
+    }
+
+    // Recalculate total_points for all users after grading
+    if (resultsSet > 0) {
+      await supabase.rpc('recalculate_all_user_points')
+      log.push('Recalculated total_points for all users')
     }
 
     log.push(`Done: teams=${teamsUpdated} results=${resultsSet} errors=${errors}`)
