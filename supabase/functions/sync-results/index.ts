@@ -225,7 +225,8 @@ Deno.serve(async () => {
         continue
       }
 
-      if (dbMatch.status === 'finished') {
+      // Skip finished GROUP-STAGE matches (idempotent; re-grade KO every run)
+      if (dbMatch.status === 'finished' && !KO_STAGES.has(dbMatch.stage)) {
         log.push(`  SKIP ${homeHe} vs ${awayHe}: already finished in DB`)
         skippedCount++
         continue
