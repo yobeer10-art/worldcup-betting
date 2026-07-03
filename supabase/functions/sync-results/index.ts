@@ -232,16 +232,34 @@ Deno.serve(async () => {
         continue
       }
 
-      log.push(`  UPDATE ${homeHe} vs ${awayHe}: ${homeScore}–${awayScore} (${result})`)
+      // ── Determine 90-min score for grading ────────────────────────
+      // For KO: regularTime = 90-min score when ET occurred; null when match ended in
+      // normal time (API quirk). fullTime = 90-min for normal-time matches, after-ET
+      // for ET matches. So: regularTime ?? fullTime always gives the correct 90-min score.
+      // For group stage: fullTime is always the final score.
+      const isKnockout = KO_STAGES.has(dbMatch.stage)
+      const score90Home = isKnockout
+        ? (m.score.regularTime?.home ?? m.score.fullTime.home)
+        : m.score.fullTime.home
+      const score90Away = isKnockout
+        ? (m.score.regularTime?.away ?? m.score.fullTime.away)
+        : m.score.fullTime.away
 
-      // ── Update match ───────────────────────────────────────────────
+      // Coerce to integer or null — guard against string/float from API
+      const s90h = score90Home != null ? Math.round(Number(score90Home)) : null
+      const s90a = score90Away != null ? Math.round(Number(score90Away)) : null
+
+      log.push(`  GRADE ${homeHe} vs ${awayHe}: 90min=${s90h ?? '?'}–${s90a ?? '?'} fullTime=${homeScore}–${awayScore} result=${result}`)
+
+      // ── Update match row ────────────────────────────────────────────
+      // Store 90-min score (what users bet on) — not after-ET score
       const { error: matchErr } = await supabase
         .from('matches')
         .update({
           result,
           status:         'finished',
-          home_score:     homeScore,
-          away_score:     awayScore,
+          home_score:     s90h ?? homeScore,
+          away_score:     s90a ?? awayScore,
           last_synced_at: new Date().toISOString(),
         })
         .eq('id', dbMatch.id)
@@ -251,69 +269,18 @@ Deno.serve(async () => {
         continue
       }
 
-      // ── Grade bets ─────────────────────────────────────────────────
-      const isKnockout = KO_STAGES.has(dbMatch.stage)
-
-      if (isKnockout) {
-        // ── Knockout: Bet1=advance pick (2pts), Bet2=exact 90-min score (3pts) ──
-        // Bet1 winner = final winner including ET + penalties (score.winner from API)
-        const winnerTeam = result === 'home' ? dbMatch.home_team : dbMatch.away_team
-
-        // Bet2 score = 90-min (regularTime) score.
-        // football-data.org returns regularTime=null for matches that ended in normal time
-        // (no ET/penalties), in which case fullTime == the 90-min score, so fall back to it.
-        // For ET/penalty matches regularTime is populated with the 90-min score; fullTime
-        // holds the after-ET/penalty score — so regularTime takes priority when non-null.
-        const rtHome = m.score.regularTime?.home ?? m.score.fullTime.home
-        const rtAway = m.score.regularTime?.away ?? m.score.fullTime.away
-
-        const { data: allBets } = await supabase
-          .from('bets')
-          .select('id, advance_pick, predicted_home_score, predicted_away_score')
-          .eq('match_id', dbMatch.id)
-
-        for (const bet of allBets ?? []) {
-          const advanceCorrect = !!bet.advance_pick && bet.advance_pick === winnerTeam
-          const advPts = advanceCorrect ? 2 : 0
-
-          const scoreCorrect =
-            rtHome !== null && rtAway !== null &&
-            bet.predicted_home_score !== null && bet.predicted_away_score !== null &&
-            bet.predicted_home_score === rtHome && bet.predicted_away_score === rtAway
-          const scorePts = scoreCorrect ? 3 : 0
-
-          await supabase.from('bets').update({
-            is_correct:     advanceCorrect,
-            advance_points: advPts,
-            points_earned:  advPts + scorePts,
-          }).eq('id', bet.id)
-        }
-      } else {
-        // ── Group stage: correct result = 1pt, exact fullTime score = 3pts ──
-        await supabase
-          .from('bets')
-          .update({ is_correct: false, points_earned: 0 })
-          .eq('match_id', dbMatch.id)
-          .neq('prediction', result)
-
-        const { data: correctBets } = await supabase
-          .from('bets')
-          .select('id, predicted_home_score, predicted_away_score')
-          .eq('match_id', dbMatch.id)
-          .eq('prediction', result)
-
-        for (const bet of correctBets ?? []) {
-          const exactMatch =
-            homeScore !== null &&
-            bet.predicted_home_score !== null &&
-            bet.predicted_home_score === homeScore &&
-            bet.predicted_away_score === awayScore
-
-          await supabase.from('bets').update({
-            is_correct:    true,
-            points_earned: exactMatch ? 3 : 1,
-          }).eq('id', bet.id)
-        }
+      // ── Grade all bets via single canonical SQL function ────────────
+      // grade_match_bets handles KO two-bet rule and group-stage logic identically
+      // to the admin set_match_result path — no divergence possible.
+      const { error: gradeErr } = await supabase.rpc('grade_match_bets', {
+        p_match_id:   dbMatch.id,
+        p_result:     result,
+        p_home_score: s90h ?? homeScore,
+        p_away_score: s90a ?? awayScore,
+      })
+      if (gradeErr) {
+        console.error(`[sync] grade_match_bets error for ${homeHe} vs ${awayHe}:`, gradeErr)
+        continue
       }
 
       updatedCount++
@@ -322,10 +289,21 @@ Deno.serve(async () => {
     // Deduplicate unmapped teams
     unmappedTeams = [...new Set(unmappedTeams)]
 
-    // Recalculate total_points for all users after grading
-    if (updatedCount > 0) {
+    // ── Always recalculate totals (idempotent; fixes any trigger lag) ──
+    await supabase.rpc('recalculate_all_user_points')
+    log.push('Recalculated total_points for all users')
+
+    // ── Self-check: verify all finished KO bets match stored scores ──
+    const { data: mismatches } = await supabase.rpc('check_ko_bet_mismatches')
+    if (mismatches && mismatches.length > 0) {
+      log.push(`⚠️ Self-check: ${mismatches.length} KO bets still mismatched — running emergency re-grade`)
+      console.error('[sync] KO mismatch after grade:', mismatches)
+      // Emergency re-grade using stored match data (bypasses API entirely)
+      await supabase.rpc('regrade_all_ko_bets')
       await supabase.rpc('recalculate_all_user_points')
-      log.push('Recalculated total_points for all users')
+      log.push('Emergency re-grade complete')
+    } else {
+      log.push(`✅ Self-check passed: all KO bets correctly graded`)
     }
 
     log.push(`Done: ${updatedCount} updated, ${skippedCount} already finished`)
