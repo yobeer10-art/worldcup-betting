@@ -286,8 +286,8 @@ Deno.serve(async () => {
         dbRow.match_date = m.utcDate
       }
 
-      // ── Grade finished matches ────────────────────────────────
-      if (m.status === 'FINISHED' && dbRow.status !== 'finished') {
+      // ── Grade finished matches (idempotent: always re-grade) ─────
+      if (m.status === 'FINISHED') {
         const apiWinner = m.score.winner
         if (!apiWinner) continue
 
@@ -371,11 +371,9 @@ Deno.serve(async () => {
       }
     }
 
-    // Recalculate total_points for all users after grading
-    if (resultsSet > 0) {
-      await supabase.rpc('recalculate_all_user_points')
-      log.push('Recalculated total_points for all users')
-    }
+    // Always recalculate (idempotent; fixes any stale totals)
+    await supabase.rpc('recalculate_all_user_points')
+    log.push('Recalculated total_points for all users')
 
     log.push(`Done: teams=${teamsUpdated} results=${resultsSet} errors=${errors}`)
 
