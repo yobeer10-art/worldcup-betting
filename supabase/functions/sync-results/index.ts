@@ -259,12 +259,13 @@ Deno.serve(async () => {
         // Bet1 winner = final winner including ET + penalties (score.winner from API)
         const winnerTeam = result === 'home' ? dbMatch.home_team : dbMatch.away_team
 
-        // Bet2 score = regularTime (90-min score) ONLY.
-        // Never fall back to fullTime: for ET/penalty matches fullTime is the after-ET
-        // score (or penalty counts), not the 90-min result.  If regularTime is null
-        // we simply can't grade the score bet — scoreCorrect stays false.
-        const rtHome = m.score.regularTime?.home ?? null
-        const rtAway = m.score.regularTime?.away ?? null
+        // Bet2 score = 90-min (regularTime) score.
+        // football-data.org returns regularTime=null for matches that ended in normal time
+        // (no ET/penalties), in which case fullTime == the 90-min score, so fall back to it.
+        // For ET/penalty matches regularTime is populated with the 90-min score; fullTime
+        // holds the after-ET/penalty score — so regularTime takes priority when non-null.
+        const rtHome = m.score.regularTime?.home ?? m.score.fullTime.home
+        const rtAway = m.score.regularTime?.away ?? m.score.fullTime.away
 
         const { data: allBets } = await supabase
           .from('bets')
