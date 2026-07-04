@@ -60,7 +60,7 @@ const TEAM_MAP: Record<string, string> = {
   'DR Congo': 'קונגו הדמוקרטית', 'Congo DR': 'קונגו הדמוקרטית',
   'Democratic Republic of Congo': 'קונגו הדמוקרטית',
   'Democratic Republic of the Congo': 'קונגו הדמוקרטית',
-  'Cape Verde': 'כף ורדה', 'Cabo Verde': 'כף ורדה',
+  'Cape Verde': 'כף ורדה', 'Cabo Verde': 'כף ורדה', 'Cape Verde Islands': 'כף ורדה',
   'Ethiopia': 'אתיופיה',
   'Japan': 'יפן', 'South Korea': 'קוריאה הדרומית',
   'Korea Republic': 'קוריאה הדרומית',

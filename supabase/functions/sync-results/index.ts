@@ -99,6 +99,7 @@ const TEAM_MAP: Record<string, string> = {
   'Democratic Republic of the Congo': 'קונגו הדמוקרטית',
   'Cape Verde':            'כף ורדה',
   'Cabo Verde':            'כף ורדה',
+  'Cape Verde Islands':    'כף ורדה',
   'Ethiopia':              'אתיופיה',
   // AFC
   'Japan':                 'יפן',
