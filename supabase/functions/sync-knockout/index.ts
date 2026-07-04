@@ -335,9 +335,11 @@ Deno.serve(async () => {
             const patch: Record<string, unknown> = {}
             if (adv.slot === 'home') {
               patch.home_team = winnerTeam
+              patch.home_source = `מנצחת משחק ${mn}`
               if (nextMatch.away_team) patch.status = 'upcoming'
             } else {
               patch.away_team = winnerTeam
+              patch.away_source = `מנצחת משחק ${mn}`
               if (nextMatch.home_team) patch.status = 'upcoming'
             }
             await supabase.from('knockout_bracket_matches').update(patch).eq('id', nextMatch.id)
