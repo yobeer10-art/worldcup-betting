@@ -373,6 +373,27 @@ Deno.serve(async () => {
       }
     }
 
+    // ── Self-heal: grade any picks on DB-finished matches that slipped through ──
+    const { data: finishedBracket } = await supabase
+      .from('knockout_bracket_matches')
+      .select('id, match_number, round, home_team, away_team, result')
+      .eq('status', 'finished')
+      .not('result', 'is', null)
+    let healed = 0
+    for (const fm of finishedBracket ?? []) {
+      const winner = fm.result === 'home' ? fm.home_team : fm.away_team
+      if (!winner) continue
+      const pts = ROUND_PTS[fm.round as string] ?? 2
+      const { count: c1 } = await supabase.from('knockout_predictions')
+        .update({ is_graded: true, points_earned: 0 }, { count: 'exact' })
+        .eq('bracket_match_id', fm.id).eq('is_graded', false).neq('predicted_winner', winner)
+      const { count: c2 } = await supabase.from('knockout_predictions')
+        .update({ is_graded: true, points_earned: pts }, { count: 'exact' })
+        .eq('bracket_match_id', fm.id).eq('is_graded', false).eq('predicted_winner', winner)
+      healed += (c1 ?? 0) + (c2 ?? 0)
+    }
+    if (healed > 0) log.push(`  Self-healed ${healed} ungraded picks`)
+
     // Always recalculate (idempotent; fixes any stale totals)
     await supabase.rpc('recalculate_all_user_points')
     log.push('Recalculated total_points for all users')
