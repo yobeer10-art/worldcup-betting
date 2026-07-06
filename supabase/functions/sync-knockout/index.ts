@@ -113,7 +113,7 @@ const ADVANCE: Record<number, { toMatch: number; slot: 'home' | 'away' }> = {
    75: { toMatch:  91, slot: 'home' }, 76: { toMatch:  90, slot: 'away' },
    77: { toMatch:  89, slot: 'away' }, 78: { toMatch:  91, slot: 'away' },
    79: { toMatch:  92, slot: 'home' }, 80: { toMatch:  92, slot: 'away' },
-   81: { toMatch:  94, slot: 'home' }, 82: { toMatch:  94, slot: 'away' },
+   81: { toMatch:  94, slot: 'away' }, 82: { toMatch:  94, slot: 'home' },
    83: { toMatch:  93, slot: 'home' }, 84: { toMatch:  93, slot: 'away' },
    85: { toMatch:  96, slot: 'home' }, 86: { toMatch:  95, slot: 'away' },
    87: { toMatch:  95, slot: 'home' }, 88: { toMatch:  96, slot: 'away' },
