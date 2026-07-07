@@ -47,6 +47,12 @@ export default function KnockoutMatchCard({
     ? (match.result === 'home' ? homeTeam : awayTeam)
     : null
 
+  // Prediction summary values (works even for ghost-team picks)
+  const userPick      = prediction?.predicted_winner ?? null
+  const pickIsCorrect = isFinished && userPick !== null && userPick === winner
+  const pickIsWrong   = isFinished && userPick !== null && userPick !== winner
+  const pickInMatch   = userPick !== null && (userPick === homeTeam || userPick === awayTeam)
+
   // Can pick if both teams are known (real or predicted), not finished, not locked
   const canPredict = !!(user && homeTeam && awayTeam && !isFinished && !autoLocked && !locked)
 
@@ -186,11 +192,42 @@ export default function KnockoutMatchCard({
             <a href="/auth" className="text-blue-500 underline">התחבר</a> כדי לנחש
           </p>
         )}
-        {isFinished && prediction?.is_graded && (
-          <div className={`mt-2 text-center text-xs font-bold ${
-            prediction.points_earned > 0 ? 'text-emerald-600' : 'text-rose-500'
+        {/* Prediction footer — shows for any match where user has a pick */}
+        {userPick && (
+          <div className={`mt-2 pt-2 border-t flex items-center gap-2 ${
+            pickIsCorrect ? 'border-emerald-100'
+            : pickIsWrong  ? 'border-rose-100'
+            : 'border-slate-100'
           }`}>
-            {prediction.points_earned > 0 ? `+${prediction.points_earned} נקודות` : '0 נקודות'}
+            <span className="text-[10px] text-slate-400 shrink-0">הימרת:</span>
+
+            {/* Ghost pick: predicted team not in this match */}
+            {!pickInMatch && (
+              <span className="text-[11px] font-bold text-slate-400 italic truncate flex-1">
+                {userPick}
+              </span>
+            )}
+
+            {/* Normal pick: predicted team IS in this match */}
+            {pickInMatch && (
+              <span className={`text-[11px] font-bold truncate flex-1 ${
+                pickIsCorrect ? 'text-emerald-600'
+                : pickIsWrong  ? 'text-rose-500'
+                : 'text-blue-600'
+              }`}>
+                {userPick}
+              </span>
+            )}
+
+            {/* Result indicator */}
+            {isFinished && pickIsCorrect && (
+              <span className="text-[11px] font-black text-emerald-600 shrink-0">
+                ✓ +{prediction.points_earned}נק׳
+              </span>
+            )}
+            {isFinished && pickIsWrong && (
+              <span className="text-[11px] font-bold text-slate-400 shrink-0">✗</span>
+            )}
           </div>
         )}
       </div>
