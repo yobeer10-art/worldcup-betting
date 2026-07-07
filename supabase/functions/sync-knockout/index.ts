@@ -150,8 +150,10 @@ interface ApiMatch {
   homeTeam:  { id?: number; name: string }
   awayTeam:  { id?: number; name: string }
   score: {
-    winner:   'HOME_TEAM' | 'AWAY_TEAM' | null
-    fullTime: { home: number | null; away: number | null }
+    winner:      'HOME_TEAM' | 'AWAY_TEAM' | null
+    duration:    'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT' | null
+    fullTime:    { home: number | null; away: number | null }
+    regularTime: { home: number | null; away: number | null } | null
   }
 }
 
@@ -292,8 +294,11 @@ Deno.serve(async () => {
         if (!apiWinner) continue
 
         const result: 'home' | 'away' = apiWinner === 'HOME_TEAM' ? 'home' : 'away'
-        const homeScore = m.score.fullTime.home
-        const awayScore = m.score.fullTime.away
+        // For pen-shootout matches, fullTime holds pen totals; use regularTime for 90-min display
+        const isPen = m.score.duration === 'PENALTY_SHOOTOUT'
+        const scoreSource = (isPen && m.score.regularTime) ? m.score.regularTime : m.score.fullTime
+        const homeScore = scoreSource.home
+        const awayScore = scoreSource.away
 
         const winnerTeam = result === 'home'
           ? (dbRow.home_team as string)
