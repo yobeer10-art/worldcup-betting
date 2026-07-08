@@ -293,12 +293,19 @@ Deno.serve(async () => {
         const apiWinner = m.score.winner
         if (!apiWinner) continue
 
-        const result: 'home' | 'away' = apiWinner === 'HOME_TEAM' ? 'home' : 'away'
+        // If the DB already has this match marked finished with a result, trust the DB.
+        // This prevents the API from overwriting manually-corrected results (e.g. M93).
+        const dbAlreadyFinished = dbRow.status === 'finished' && dbRow.result != null
+
+        const result: 'home' | 'away' = dbAlreadyFinished
+          ? (dbRow.result as 'home' | 'away')
+          : (apiWinner === 'HOME_TEAM' ? 'home' : 'away')
+
         // For pen-shootout matches, fullTime holds pen totals; use regularTime for 90-min display
         const isPen = m.score.duration === 'PENALTY_SHOOTOUT'
         const scoreSource = (isPen && m.score.regularTime) ? m.score.regularTime : m.score.fullTime
-        const homeScore = scoreSource.home
-        const awayScore = scoreSource.away
+        const homeScore = dbAlreadyFinished ? (dbRow.home_score as number) : scoreSource.home
+        const awayScore = dbAlreadyFinished ? (dbRow.away_score as number) : scoreSource.away
 
         const winnerTeam = result === 'home'
           ? (dbRow.home_team as string)
@@ -312,10 +319,12 @@ Deno.serve(async () => {
           continue
         }
 
-        await supabase
-          .from('knockout_bracket_matches')
-          .update({ result, status: 'finished', home_score: homeScore, away_score: awayScore })
-          .eq('id', dbId)
+        if (!dbAlreadyFinished) {
+          await supabase
+            .from('knockout_bracket_matches')
+            .update({ result, status: 'finished', home_score: homeScore, away_score: awayScore })
+            .eq('id', dbId)
+        }
 
         // Grade predictions
         const pts = ROUND_PTS[dbRow.round as string] ?? 2
