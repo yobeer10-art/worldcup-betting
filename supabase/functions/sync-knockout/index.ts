@@ -293,9 +293,11 @@ Deno.serve(async () => {
         const apiWinner = m.score.winner
         if (!apiWinner) continue
 
-        // If the DB already has this match marked finished with a result, trust the DB.
-        // This prevents the API from overwriting manually-corrected results (e.g. M93).
-        const dbAlreadyFinished = dbRow.status === 'finished' && dbRow.result != null
+        // Matches where the API result is wrong and we have the correct result in DB.
+        // These match numbers are NEVER overwritten by the API, regardless of what it reports.
+        const MANUAL_OVERRIDE_MATCHES = new Set([93])
+        const isManualOverride = MANUAL_OVERRIDE_MATCHES.has(mn)
+        const dbAlreadyFinished = isManualOverride || (dbRow.status === 'finished' && dbRow.result != null)
 
         const result: 'home' | 'away' = dbAlreadyFinished
           ? (dbRow.result as 'home' | 'away')
