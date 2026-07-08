@@ -177,12 +177,23 @@ export default function KnockoutMatchCard({
           </span>
         </div>
 
-        {/* Teams */}
-        <div className="flex gap-2">
-          <TeamButton team={homeTeam} source={homeSource} isPresumed={homePredicted} />
-          <div className="flex items-center text-slate-300 font-black text-sm flex-shrink-0 mt-1">vs</div>
-          <TeamButton team={awayTeam} source={awaySource} isPresumed={awayPredicted} />
-        </div>
+        {/* Teams — or single-prediction preview when real teams not yet decided */}
+        {!homeTeam && !awayTeam && userPick ? (
+          <div className="flex flex-col items-center gap-1.5 py-3">
+            <span className="text-[10px] text-slate-400">הניחוש שלי לשלב זה:</span>
+            <div className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl border-2 border-blue-300 bg-blue-50">
+              <FlagImg team={userPick} size="md" />
+              <span className="text-xs font-bold text-slate-700 text-center">{userPick}</span>
+            </div>
+            <span className="text-[10px] text-slate-300 italic">המשחק טרם נקבע</span>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <TeamButton team={homeTeam} source={homeSource} isPresumed={homePredicted} />
+            <div className="flex items-center text-slate-300 font-black text-sm flex-shrink-0 mt-1">vs</div>
+            <TeamButton team={awayTeam} source={awaySource} isPresumed={awayPredicted} />
+          </div>
+        )}
 
         {justSaved && (
           <p className="text-xs text-emerald-600 font-semibold mt-2 text-center animate-pulse">✅ נשמר!</p>
