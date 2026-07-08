@@ -177,15 +177,26 @@ export default function KnockoutMatchCard({
           </span>
         </div>
 
-        {/* Teams — or single-prediction preview when real teams not yet decided */}
-        {!homeTeam && !awayTeam && userPick ? (
-          <div className="flex flex-col items-center gap-1.5 py-3">
-            <span className="text-[10px] text-slate-400">הניחוש שלי לשלב זה:</span>
-            <div className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl border-2 border-blue-300 bg-blue-50">
-              <FlagImg team={userPick} size="md" />
-              <span className="text-xs font-bold text-slate-700 text-center">{userPick}</span>
+        {/* Teams — or pending preview when real teams not yet decided */}
+        {!homeTeam && !awayTeam ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 flex flex-col gap-2">
+            {/* "Not set yet" badge */}
+            <div className="flex items-center justify-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-400 tracking-wide uppercase">⏳ טרם נקבע</span>
             </div>
-            <span className="text-[10px] text-slate-300 italic">המשחק טרם נקבע</span>
+            {/* User's prediction for this slot */}
+            {userPick ? (
+              <div className="flex items-center gap-2 bg-white border border-blue-200 rounded-lg px-3 py-2">
+                <FlagImg team={userPick} size="sm" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[10px] text-slate-400 leading-tight">הניחוש שלך:</span>
+                  <span className="text-xs font-bold text-blue-700 truncate">{userPick}</span>
+                </div>
+                <span className="mr-auto text-[10px] text-slate-300 italic shrink-0">לא סופי</span>
+              </div>
+            ) : (
+              <p className="text-[11px] text-slate-400 text-center">המשחק יקבע כשהשלב הקודם יסתיים</p>
+            )}
           </div>
         ) : (
           <div className="flex gap-2">
