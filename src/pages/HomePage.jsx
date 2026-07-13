@@ -4,8 +4,11 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Layout/Header'
 import MatchCard from '../components/Matches/MatchCard'
+import CompactMatchCard from '../components/Matches/CompactMatchCard'
 import FlagImg from '../components/UI/FlagImg'
 import Spinner from '../components/UI/Spinner'
+
+const KO_STAGES = new Set(['round_of_32','round_of_16','quarter','semi','third_place','final'])
 
 /* ── Date helpers (Israel time) ──────────────────────────────── */
 function israelToday() {
@@ -234,13 +237,22 @@ export default function HomePage() {
           ) : (
             <div className="space-y-4">
               {matches.map(m => (
-                <MatchCard
-                  key={m.id}
-                  match={m}
-                  userBet={userBets[m.id] ?? null}
-                  communityStats={stats[m.id] ?? null}
-                  onBetPlaced={fetchAll}
-                />
+                KO_STAGES.has(m.stage)
+                  ? <CompactMatchCard
+                      key={m.id}
+                      match={m}
+                      userBet={userBets[m.id] ?? null}
+                      communityStats={stats[m.id] ?? null}
+                      onBetPlaced={fetchAll}
+                      isToday={!isNext}
+                    />
+                  : <MatchCard
+                      key={m.id}
+                      match={m}
+                      userBet={userBets[m.id] ?? null}
+                      communityStats={stats[m.id] ?? null}
+                      onBetPlaced={fetchAll}
+                    />
               ))}
             </div>
           )}
