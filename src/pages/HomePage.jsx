@@ -48,13 +48,37 @@ function Countdown({ target }) {
 }
 
 /* ── Unified knockout hub: hype + countdown + betting in one ─── */
-function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced }) {
+function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, scorer, user }) {
   const nextUp  = bigMatches.find(m => m.status === 'upcoming' && new Date(m.match_date).getTime() > Date.now())
   const isFinal = bigMatches.some(m => m.stage === 'final')
   const stageLabel = isFinal ? 'הגמר הגדול' : STAGE_LABEL[bigMatches[0]?.stage] ?? 'נוקאאוט'
   const unbetCount = bigMatches.filter(m =>
     m.status === 'upcoming' && !userBets[m.id]?.advance_pick
   ).length
+
+  // Teams still in the title race: SF participants, minus SF losers once decided
+  const aliveTeams = new Set()
+  bigMatches.filter(m => m.stage === 'semi').forEach(m => {
+    if (m.status === 'finished' && m.result) {
+      aliveTeams.add(m.result === 'home' ? m.home_team : m.away_team)
+    } else {
+      aliveTeams.add(m.home_team)
+      aliveTeams.add(m.away_team)
+    }
+  })
+  bigMatches.filter(m => m.stage === 'final').forEach(m => {
+    if (m.status === 'finished' && m.result) {
+      aliveTeams.clear()
+      aliveTeams.add(m.result === 'home' ? m.home_team : m.away_team)
+    }
+  })
+  const champAlive = champion != null && aliveTeams.size > 0 && aliveTeams.has(champion)
+
+  // Tournament progress: 104 total matches; remaining = unfinished among SF/3rd/Final
+  // (3rd place + final rows may not exist yet — count them as remaining anyway)
+  const bigFinished  = bigMatches.filter(m => m.status === 'finished').length
+  const playedTotal  = 100 + bigFinished
+  const progressPct  = Math.round((playedTotal / 104) * 100)
 
   return (
     <div className={`relative overflow-hidden rounded-3xl shadow-xl ${
@@ -90,6 +114,20 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced }) {
           <span className="bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 text-[11px] font-extrabold">
             🎯 תוצאה מדויקת = <span className="text-amber-300">5 נק׳</span>
           </span>
+        </div>
+
+        {/* Final-stretch progress bar */}
+        <div className="mb-3">
+          <div className="flex justify-between items-center text-[10px] font-bold mb-1">
+            <span className="text-amber-300">🏁 הישורת האחרונה של המונדיאל</span>
+            <span className="text-white/60 tabular-nums">{playedTotal}/104 משחקים</span>
+          </div>
+          <div className="h-2 bg-white/15 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-300 rounded-full transition-all duration-1000"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
         </div>
 
         {/* Countdown to next kickoff */}
@@ -128,6 +166,71 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced }) {
           />
         ))}
       </div>
+
+      {/* Grand bets: champion + top scorer, right here in the party */}
+      {user && (
+        <div className="relative px-3 pb-4">
+          <p className="text-center text-[10px] font-extrabold tracking-widest uppercase text-white/50 mb-2">
+            — ההימורים הגדולים שלך · 25 נק׳ כל אחד —
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+
+            {/* Champion pick */}
+            <Link
+              to="/special?t=champion"
+              className={`rounded-2xl p-3 border-2 backdrop-blur-sm transition-all ${
+                champion
+                  ? champAlive
+                    ? 'bg-gradient-to-br from-amber-400/25 to-yellow-500/15 border-amber-300/60'
+                    : 'bg-white/5 border-white/15 opacity-80'
+                  : 'bg-white/10 border-dashed border-white/30 hover:bg-white/15'
+              }`}
+            >
+              <p className="text-[9px] font-extrabold text-white/60 uppercase tracking-wide mb-1.5">
+                🥇 האלופה שלך
+              </p>
+              {champion ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <FlagImg team={champion} size="sm" />
+                    <span className="text-xs font-black text-white truncate">{champion}</span>
+                  </div>
+                  <p className={`text-[10px] font-extrabold mt-1.5 ${
+                    champAlive ? 'text-amber-300 animate-pulse' : 'text-white/40'
+                  }`}>
+                    {champAlive ? '🔥 עדיין במירוץ לגביע!' : '💔 הודחה מהמירוץ'}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs font-bold text-amber-300">עוד לא בחרת →</p>
+              )}
+            </Link>
+
+            {/* Top scorer pick */}
+            <Link
+              to="/special?t=scorer"
+              className={`rounded-2xl p-3 border-2 backdrop-blur-sm transition-all ${
+                scorer
+                  ? 'bg-gradient-to-br from-sky-400/25 to-cyan-500/15 border-sky-300/50'
+                  : 'bg-white/10 border-dashed border-white/30 hover:bg-white/15'
+              }`}
+            >
+              <p className="text-[9px] font-extrabold text-white/60 uppercase tracking-wide mb-1.5">
+                ⚽ מלך השערים שלך
+              </p>
+              {scorer ? (
+                <>
+                  <span className="text-xs font-black text-white leading-snug line-clamp-2">{scorer}</span>
+                  <p className="text-[10px] font-extrabold text-sky-300 mt-1.5">🎯 בתקווה שיכבוש בגמר!</p>
+                </>
+              ) : (
+                <p className="text-xs font-bold text-sky-300">עוד לא בחרת →</p>
+              )}
+            </Link>
+
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -272,9 +375,14 @@ export default function HomePage() {
         {user ? (
           <div className="bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600
                           rounded-2xl p-5 text-white shadow-md">
-            <p className="text-emerald-100 text-sm mb-3">
+            <p className="text-emerald-100 text-sm mb-1">
               שלום, <span className="font-bold">{profile?.display_name || 'שחקן'}</span> 👋
             </p>
+            {bigMatches.length > 0 && (
+              <p className="text-[11px] text-amber-200 font-extrabold mb-3">
+                🏆 הישורת האחרונה — כל נקודה שווה זהב!
+              </p>
+            )}
             <div className="flex items-end gap-4">
               <div className="flex-1">
                 <div className="flex items-baseline gap-1">
@@ -316,6 +424,9 @@ export default function HomePage() {
             userBets={userBets}
             stats={stats}
             onBetPlaced={fetchAll}
+            champion={champion}
+            scorer={scorer}
+            user={user}
           />
         )}
 
@@ -409,7 +520,8 @@ export default function HomePage() {
           </section>
         )}
 
-        {/* ── Special bets quick status ───────────────────────── */}
+        {/* ── Special bets quick status (hidden when hub shows them) ── */}
+        {bigMatches.length === 0 && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-extrabold text-slate-800">🏆 ניחושים מיוחדים</h2>
@@ -460,6 +572,7 @@ export default function HomePage() {
 
           </div>
         </section>
+        )}
 
       </main>
     </>
