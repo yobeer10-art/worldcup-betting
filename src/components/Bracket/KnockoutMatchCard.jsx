@@ -178,7 +178,8 @@ export default function KnockoutMatchCard({
         </div>
 
         {/* Teams — or pending preview when real teams not yet decided */}
-        {!homeTeam && !awayTeam ? (
+        {/* Check match.home_team/away_team (raw DB), not derived getEff values which fill from user picks */}
+        {!match.home_team && !match.away_team ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 flex flex-col gap-2">
             {/* "Not set yet" badge */}
             <div className="flex items-center justify-center gap-1.5">
