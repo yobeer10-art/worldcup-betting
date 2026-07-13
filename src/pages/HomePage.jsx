@@ -10,6 +10,82 @@ import Spinner from '../components/UI/Spinner'
 
 const KO_STAGES = new Set(['round_of_32','round_of_16','quarter','semi','third_place','final'])
 
+const STAGE_LABEL = {
+  quarter: 'רבע הגמר', semi: 'חצי הגמר', third_place: 'מקום שלישי', final: 'הגמר הגדול',
+}
+
+/* ── Big-match spotlight with live countdown ─────────────────── */
+function BigMatchSpotlight({ match }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const ms = new Date(match.match_date).getTime() - now
+  if (ms <= 0) return null
+
+  const days  = Math.floor(ms / 86_400_000)
+  const hours = Math.floor((ms % 86_400_000) / 3_600_000)
+  const mins  = Math.floor((ms % 3_600_000) / 60_000)
+  const secs  = Math.floor((ms % 60_000) / 1000)
+  const stageLabel = STAGE_LABEL[match.stage] ?? 'נוקאאוט'
+  const isFinal = match.stage === 'final'
+
+  return (
+    <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${
+      isFinal
+        ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600'
+        : 'bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600'
+    }`}>
+      {/* Decorative glow */}
+      <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute -bottom-12 -right-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
+      <div className="relative">
+        <p className="text-[11px] font-extrabold tracking-widest uppercase text-white/70 mb-2">
+          {isFinal ? '🏆' : '⚡'} {stageLabel}
+        </p>
+
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <div className="flex flex-col items-center gap-1 flex-1">
+            <FlagImg team={match.home_team} size="lg" />
+            <span className="text-sm font-extrabold text-center leading-tight">{match.home_team}</span>
+          </div>
+          <span className="text-white/50 font-black text-lg shrink-0">VS</span>
+          <div className="flex flex-col items-center gap-1 flex-1">
+            <FlagImg team={match.away_team} size="lg" />
+            <span className="text-sm font-extrabold text-center leading-tight">{match.away_team}</span>
+          </div>
+        </div>
+
+        {/* Countdown */}
+        <div className="flex justify-center gap-2" dir="ltr">
+          {[
+            { v: days,  l: 'ימים'   },
+            { v: hours, l: 'שעות'   },
+            { v: mins,  l: 'דקות'   },
+            { v: secs,  l: 'שניות'  },
+          ].map(({ v, l }) => (
+            <div key={l} className="bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-[52px] text-center">
+              <div className="text-xl font-black tabular-nums leading-none">{String(v).padStart(2, '0')}</div>
+              <div className="text-[9px] text-white/60 font-semibold mt-0.5">{l}</div>
+            </div>
+          ))}
+        </div>
+
+        <Link
+          to="/matches"
+          className="mt-4 block w-full text-center bg-white/20 hover:bg-white/30 backdrop-blur-sm
+                     rounded-xl py-2 text-sm font-extrabold transition-colors"
+        >
+          🎯 הימר עכשיו ←
+        </Link>
+      </div>
+    </div>
+  )
+}
+
 /* ── Date helpers (Israel time) ──────────────────────────────── */
 function israelToday() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' })
@@ -169,6 +245,16 @@ export default function HomePage() {
             </Link>
           </div>
         )}
+
+        {/* ── Big-match spotlight (SF / Final countdown) ─────── */}
+        {!loading && (() => {
+          const big = matches.find(m =>
+            ['semi', 'final', 'third_place'].includes(m.stage) &&
+            m.status === 'upcoming' &&
+            new Date(m.match_date).getTime() > Date.now()
+          )
+          return big ? <BigMatchSpotlight match={big} /> : null
+        })()}
 
         {/* ── Smart next-bet nudge ──────────────────────────── */}
         {user && !loading && (() => {
