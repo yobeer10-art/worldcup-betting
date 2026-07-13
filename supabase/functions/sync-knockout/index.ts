@@ -303,9 +303,10 @@ Deno.serve(async () => {
           ? (dbRow.result as 'home' | 'away')
           : (apiWinner === 'HOME_TEAM' ? 'home' : 'away')
 
-        // For pen-shootout matches, fullTime holds pen totals; use regularTime for 90-min display
-        const isPen = m.score.duration === 'PENALTY_SHOOTOUT'
-        const scoreSource = (isPen && m.score.regularTime) ? m.score.regularTime : m.score.fullTime
+        // Rule: stored score is ALWAYS the 90-min score. For ET/pens matches,
+        // fullTime holds the 120-min/pen total — use regularTime instead.
+        const wentBeyond90 = m.score.duration === 'PENALTY_SHOOTOUT' || m.score.duration === 'EXTRA_TIME'
+        const scoreSource = (wentBeyond90 && m.score.regularTime) ? m.score.regularTime : m.score.fullTime
         const homeScore = dbAlreadyFinished ? (dbRow.home_score as number) : scoreSource.home
         const awayScore = dbAlreadyFinished ? (dbRow.away_score as number) : scoreSource.away
 
