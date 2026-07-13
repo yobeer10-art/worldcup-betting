@@ -13,6 +13,13 @@ const BET = {
 
 const KO_STAGES = new Set(['round_of_32','round_of_16','quarter','semi','third_place','final'])
 
+// From the semis onward the stakes rise: advance 3pts, exact score 5pts
+export function koPoints(stage) {
+  return ['semi','third_place','final'].includes(stage)
+    ? { adv: 3, score: 5 }
+    : { adv: 2, score: 3 }
+}
+
 /* ── Helpers ─────────────────────────────────────────────────── */
 function israelTime(iso) {
   return new Date(iso).toLocaleTimeString('he-IL', {
@@ -411,6 +418,7 @@ function KnockoutBetOpen({
     { name: match.home_team, side: 'home' },
     { name: match.away_team, side: 'away' },
   ]
+  const pts = koPoints(match.stage)
 
   return (
     <>
@@ -418,7 +426,7 @@ function KnockoutBetOpen({
       <div>
         <p className="text-[9px] font-extrabold text-slate-500 mb-1 flex items-center gap-1">
           <span>⚡</span> מי עולה הלאה
-          <span className="text-rose-400 font-bold">2נק׳</span>
+          <span className="text-rose-400 font-bold">{pts.adv}נק׳</span>
         </p>
         <div className="grid grid-cols-2 gap-1">
           {teams.map(({ name }) => {
@@ -447,7 +455,7 @@ function KnockoutBetOpen({
       <div>
         <p className="text-[9px] font-extrabold text-slate-500 mb-1 flex items-center gap-1">
           <span>🎯</span> תוצאה מדויקת (90 דקות)
-          <span className="text-amber-500 font-bold">3נק׳</span>
+          <span className="text-amber-500 font-bold">{pts.score}נק׳</span>
         </p>
         <div className="flex items-center gap-1.5">
           <input

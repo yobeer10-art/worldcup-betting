@@ -14,73 +14,119 @@ const STAGE_LABEL = {
   quarter: 'רבע הגמר', semi: 'חצי הגמר', third_place: 'מקום שלישי', final: 'הגמר הגדול',
 }
 
-/* ── Big-match spotlight with live countdown ─────────────────── */
-function BigMatchSpotlight({ match }) {
+/* ── Live countdown row ──────────────────────────────────────── */
+function Countdown({ target }) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  const ms = new Date(match.match_date).getTime() - now
+  const ms = new Date(target).getTime() - now
   if (ms <= 0) return null
 
   const days  = Math.floor(ms / 86_400_000)
   const hours = Math.floor((ms % 86_400_000) / 3_600_000)
   const mins  = Math.floor((ms % 3_600_000) / 60_000)
   const secs  = Math.floor((ms % 60_000) / 1000)
-  const stageLabel = STAGE_LABEL[match.stage] ?? 'נוקאאוט'
-  const isFinal = match.stage === 'final'
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl p-5 text-white shadow-lg ${
+    <div className="flex justify-center gap-2" dir="ltr">
+      {[
+        { v: days,  l: 'ימים'  },
+        { v: hours, l: 'שעות'  },
+        { v: mins,  l: 'דקות'  },
+        { v: secs,  l: 'שניות' },
+      ].map(({ v, l }) => (
+        <div key={l} className="bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-[52px] text-center">
+          <div className="text-xl font-black tabular-nums leading-none">{String(v).padStart(2, '0')}</div>
+          <div className="text-[9px] text-white/60 font-semibold mt-0.5">{l}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* ── Unified knockout hub: hype + countdown + betting in one ─── */
+function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced }) {
+  const nextUp  = bigMatches.find(m => m.status === 'upcoming' && new Date(m.match_date).getTime() > Date.now())
+  const isFinal = bigMatches.some(m => m.stage === 'final')
+  const stageLabel = isFinal ? 'הגמר הגדול' : STAGE_LABEL[bigMatches[0]?.stage] ?? 'נוקאאוט'
+  const unbetCount = bigMatches.filter(m =>
+    m.status === 'upcoming' && !userBets[m.id]?.advance_pick
+  ).length
+
+  return (
+    <div className={`relative overflow-hidden rounded-3xl shadow-xl ${
       isFinal
         ? 'bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600'
-        : 'bg-gradient-to-br from-indigo-600 via-purple-600 to-fuchsia-600'
+        : 'bg-gradient-to-br from-indigo-700 via-purple-700 to-fuchsia-700'
     }`}>
-      {/* Decorative glow */}
-      <div className="absolute -top-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-      <div className="absolute -bottom-12 -right-8 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+      {/* Decorative glows */}
+      <div className="absolute -top-12 -left-12 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-14 -right-10 w-44 h-44 bg-white/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative">
-        <p className="text-[11px] font-extrabold tracking-widest uppercase text-white/70 mb-2">
-          {isFinal ? '🏆' : '⚡'} {stageLabel}
-        </p>
-
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="flex flex-col items-center gap-1 flex-1">
-            <FlagImg team={match.home_team} size="lg" />
-            <span className="text-sm font-extrabold text-center leading-tight">{match.home_team}</span>
-          </div>
-          <span className="text-white/50 font-black text-lg shrink-0">VS</span>
-          <div className="flex flex-col items-center gap-1 flex-1">
-            <FlagImg team={match.away_team} size="lg" />
-            <span className="text-sm font-extrabold text-center leading-tight">{match.away_team}</span>
-          </div>
+      <div className="relative p-4 pb-3 text-white">
+        {/* Title */}
+        <div className="text-center mb-1">
+          <p className="text-[11px] font-extrabold tracking-[0.25em] uppercase text-white/60">
+            {isFinal ? '🏆 מונדיאל 2026 🏆' : '⚡ מונדיאל 2026 ⚡'}
+          </p>
+          <h2 className="text-2xl font-black leading-tight mt-0.5">
+            {stageLabel} כאן!
+          </h2>
+          <p className="text-[12px] text-white/80 font-semibold mt-1">
+            {isFinal
+              ? 'משחק אחד. גביע אחד. ההימור הכי חשוב שלך.'
+              : '4 נבחרות. 2 כרטיסים לגמר. ההימור שלך על הפרק.'}
+          </p>
         </div>
 
-        {/* Countdown */}
-        <div className="flex justify-center gap-2" dir="ltr">
-          {[
-            { v: days,  l: 'ימים'   },
-            { v: hours, l: 'שעות'   },
-            { v: mins,  l: 'דקות'   },
-            { v: secs,  l: 'שניות'  },
-          ].map(({ v, l }) => (
-            <div key={l} className="bg-white/15 backdrop-blur-sm rounded-xl px-2.5 py-1.5 min-w-[52px] text-center">
-              <div className="text-xl font-black tabular-nums leading-none">{String(v).padStart(2, '0')}</div>
-              <div className="text-[9px] text-white/60 font-semibold mt-0.5">{l}</div>
-            </div>
-          ))}
+        {/* Boosted points banner */}
+        <div className="flex items-center justify-center gap-2 my-3">
+          <span className="bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 text-[11px] font-extrabold">
+            ⚡ עולה לגמר = <span className="text-amber-300">3 נק׳</span>
+          </span>
+          <span className="bg-white/15 backdrop-blur-sm rounded-full px-3 py-1 text-[11px] font-extrabold">
+            🎯 תוצאה מדויקת = <span className="text-amber-300">5 נק׳</span>
+          </span>
         </div>
 
-        <Link
-          to="/matches"
-          className="mt-4 block w-full text-center bg-white/20 hover:bg-white/30 backdrop-blur-sm
-                     rounded-xl py-2 text-sm font-extrabold transition-colors"
-        >
-          🎯 הימר עכשיו ←
-        </Link>
+        {/* Countdown to next kickoff */}
+        {nextUp && (
+          <div className="mb-1">
+            <p className="text-center text-[10px] text-white/60 font-bold mb-1.5">
+              המשחק הקרוב: {nextUp.home_team} נגד {nextUp.away_team}
+            </p>
+            <Countdown target={nextUp.match_date} />
+          </div>
+        )}
+
+        {/* Urgency nudge */}
+        {unbetCount > 0 && (
+          <p className="text-center text-[12px] font-extrabold text-amber-300 mt-3 animate-pulse">
+            🔥 {unbetCount === 1 ? 'משחק אחד עוד מחכה להימור שלך' : `${unbetCount} משחקים עוד מחכים להימור שלך`} — אל תפספס!
+          </p>
+        )}
+        {unbetCount === 0 && bigMatches.some(m => m.status === 'upcoming') && (
+          <p className="text-center text-[12px] font-extrabold text-emerald-300 mt-3">
+            ✅ כל ההימורים שלך בפנים — בהצלחה!
+          </p>
+        )}
+      </div>
+
+      {/* Betting cards embedded */}
+      <div className="relative px-3 pb-3 space-y-3">
+        {bigMatches.map(m => (
+          <CompactMatchCard
+            key={m.id}
+            match={m}
+            userBet={userBets[m.id] ?? null}
+            communityStats={stats[m.id] ?? null}
+            onBetPlaced={onBetPlaced}
+            isToday
+          />
+        ))}
       </div>
     </div>
   )
@@ -107,6 +153,7 @@ export default function HomePage() {
   const { user, profile } = useAuth()
 
   const [matches,    setMatches]    = useState([])
+  const [bigKoMatches, setBigKoMatches] = useState([])
   const [userBets,   setUserBets]   = useState({})
   const [stats,      setStats]      = useState({})
   const [rank,       setRank]       = useState(null)
@@ -155,8 +202,19 @@ export default function HomePage() {
     setDateStr(usedDate)
     setIsNext(next)
 
+    // ── Big KO matches (SF / 3rd / Final) — always fetched, all days ──
+    const { data: bigData } = await supabase
+      .from('matches').select('*')
+      .in('stage', ['semi', 'third_place', 'final'])
+      .order('match_date')
+    setBigKoMatches(bigData ?? [])
+
     // ── Parallel fetches ─────────────────────────────────────────
-    const ids = (dayMatches ?? []).map(m => m.id)
+    const idSet = new Set([
+      ...(dayMatches ?? []).map(m => m.id),
+      ...(bigData ?? []).map(m => m.id),
+    ])
+    const ids = [...idSet]
     const [statsRes, totalRes, betsRes, rankRes, champRes, scorerRes] =
       await Promise.all([
         ids.length
@@ -164,7 +222,7 @@ export default function HomePage() {
           : Promise.resolve({ data: [] }),
         supabase.from('users').select('id', { count: 'exact', head: true }),
         user && ids.length
-          ? supabase.from('bets').select('match_id').eq('user_id', user.id).in('match_id', ids)
+          ? supabase.from('bets').select('*').eq('user_id', user.id).in('match_id', ids)
           : Promise.resolve({ data: [] }),
         user
           ? supabase.from('users').select('id', { count: 'exact', head: true })
@@ -198,6 +256,11 @@ export default function HomePage() {
   }, [user, profile?.total_points])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+
+  // Big KO matches (SF / 3rd place / Final) get the unified hub treatment.
+  // Hub shows upcoming/live plus recently finished (until the next stage starts).
+  const bigMatches   = bigKoMatches
+  const otherMatches = matches.filter(m => !['semi', 'third_place', 'final'].includes(m.stage))
 
   /* ── Render ──────────────────────────────────────────────────── */
   return (
@@ -246,18 +309,18 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* ── Big-match spotlight (SF / Final countdown) ─────── */}
-        {!loading && (() => {
-          const big = matches.find(m =>
-            ['semi', 'final', 'third_place'].includes(m.stage) &&
-            m.status === 'upcoming' &&
-            new Date(m.match_date).getTime() > Date.now()
-          )
-          return big ? <BigMatchSpotlight match={big} /> : null
-        })()}
+        {/* ── Unified knockout hub (SF / Final: hype + betting) ── */}
+        {!loading && bigMatches.length > 0 && (
+          <KnockoutHub
+            bigMatches={bigMatches}
+            userBets={userBets}
+            stats={stats}
+            onBetPlaced={fetchAll}
+          />
+        )}
 
-        {/* ── Smart next-bet nudge ──────────────────────────── */}
-        {user && !loading && (() => {
+        {/* ── Smart next-bet nudge (hidden when hub is showing — it has its own) ── */}
+        {user && !loading && bigMatches.length === 0 && (() => {
           const now = Date.now()
           const nextUnbet = matches.find(m =>
             m.status === 'upcoming' &&
@@ -302,47 +365,49 @@ export default function HomePage() {
           )
         })()}
 
-        {/* ── Today's / next matches ──────────────────────────── */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-extrabold text-slate-800">
-              {isNext ? '⚽ משחקים קרובים' : `⚽ משחקי היום · ${hebrewDateShort(dateStr)}`}
-            </h2>
-            <Link to="/matches" className="text-xs text-emerald-600 font-semibold hover:underline">
-              כל המשחקים ←
-            </Link>
-          </div>
+        {/* ── Today's / next matches (big KO matches live in the hub above) ── */}
+        {(loading || bigMatches.length === 0 || otherMatches.length > 0) && (
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-extrabold text-slate-800">
+                {isNext ? '⚽ משחקים קרובים' : `⚽ משחקי היום · ${hebrewDateShort(dateStr)}`}
+              </h2>
+              <Link to="/matches" className="text-xs text-emerald-600 font-semibold hover:underline">
+                כל המשחקים ←
+              </Link>
+            </div>
 
-          {loading ? (
-            <Spinner size="sm" />
-          ) : matches.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center">
-              <div className="text-3xl mb-2">🏆</div>
-              <p className="text-slate-500 text-sm font-medium">אין משחקים בתקופה הקרובה</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {matches.map(m => (
-                KO_STAGES.has(m.stage)
-                  ? <CompactMatchCard
-                      key={m.id}
-                      match={m}
-                      userBet={userBets[m.id] ?? null}
-                      communityStats={stats[m.id] ?? null}
-                      onBetPlaced={fetchAll}
-                      isToday={!isNext}
-                    />
-                  : <MatchCard
-                      key={m.id}
-                      match={m}
-                      userBet={userBets[m.id] ?? null}
-                      communityStats={stats[m.id] ?? null}
-                      onBetPlaced={fetchAll}
-                    />
-              ))}
-            </div>
-          )}
-        </section>
+            {loading ? (
+              <Spinner size="sm" />
+            ) : otherMatches.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center">
+                <div className="text-3xl mb-2">🏆</div>
+                <p className="text-slate-500 text-sm font-medium">אין משחקים בתקופה הקרובה</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {otherMatches.map(m => (
+                  KO_STAGES.has(m.stage)
+                    ? <CompactMatchCard
+                        key={m.id}
+                        match={m}
+                        userBet={userBets[m.id] ?? null}
+                        communityStats={stats[m.id] ?? null}
+                        onBetPlaced={fetchAll}
+                        isToday={!isNext}
+                      />
+                    : <MatchCard
+                        key={m.id}
+                        match={m}
+                        userBet={userBets[m.id] ?? null}
+                        communityStats={stats[m.id] ?? null}
+                        onBetPlaced={fetchAll}
+                      />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ── Special bets quick status ───────────────────────── */}
         <section>
