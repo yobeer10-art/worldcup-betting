@@ -260,6 +260,7 @@ export default function HomePage() {
   const [userBets,   setUserBets]   = useState({})
   const [stats,      setStats]      = useState({})
   const [rank,       setRank]       = useState(null)
+  const [koPts,      setKoPts]      = useState(null)
   const [totalUsers, setTotalUsers] = useState(0)
   const [champion,   setChampion]   = useState(null)
   const [scorer,     setScorer]     = useState(null)
@@ -318,7 +319,7 @@ export default function HomePage() {
       ...(bigData ?? []).map(m => m.id),
     ])
     const ids = [...idSet]
-    const [statsRes, totalRes, betsRes, rankRes, champRes, scorerRes] =
+    const [statsRes, totalRes, betsRes, koLbRes, champRes, scorerRes] =
       await Promise.all([
         ids.length
           ? supabase.from('bet_stats').select('*').in('match_id', ids)
@@ -327,10 +328,7 @@ export default function HomePage() {
         user && ids.length
           ? supabase.from('bets').select('*').eq('user_id', user.id).in('match_id', ids)
           : Promise.resolve({ data: [] }),
-        user
-          ? supabase.from('users').select('id', { count: 'exact', head: true })
-              .gt('total_points', profile?.total_points ?? -1)
-          : Promise.resolve({ count: null }),
+        supabase.rpc('knockout_leaderboard'),
         user
           ? supabase.from('champion_predictions').select('team')
               .eq('user_id', user.id).maybeSingle()
@@ -351,7 +349,15 @@ export default function HomePage() {
     betsRes.data?.forEach(b => { bm[b.match_id] = b })
     setUserBets(bm)
 
-    if (rankRes.count != null) setRank(rankRes.count + 1)
+    // Knockout leaderboard: hero shows KO points + KO rank (not the overall table)
+    if (user && koLbRes.data?.length) {
+      const koList = koLbRes.data
+      const idx = koList.findIndex(r => r.user_id === user.id)
+      if (idx >= 0) {
+        setKoPts(Number(koList[idx].knockout_points ?? 0))
+        setRank(idx + 1)
+      }
+    }
     setChampion(champRes.data?.team ?? null)
     setScorer(scorerRes.data?.player_name ?? null)
 
@@ -387,15 +393,19 @@ export default function HomePage() {
               <div className="flex-1">
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-extrabold tabular-nums leading-none">
-                    {profile?.total_points ?? 0}
+                    {koPts ?? profile?.total_points ?? 0}
                   </span>
-                  <span className="text-emerald-200 text-base">נקודות</span>
+                  <span className="text-emerald-200 text-base">
+                    {koPts != null ? 'נק׳ נוקאאוט' : 'נקודות'}
+                  </span>
                 </div>
               </div>
               {rank && (
                 <div className="text-right">
                   <div className="text-2xl font-extrabold">#{rank}</div>
-                  <p className="text-emerald-200 text-xs">מתוך {totalUsers} שחקנים</p>
+                  <p className="text-emerald-200 text-xs">
+                    {koPts != null ? `בטבלת הנוקאאוט · ${totalUsers} שחקנים` : `מתוך ${totalUsers} שחקנים`}
+                  </p>
                 </div>
               )}
             </div>
