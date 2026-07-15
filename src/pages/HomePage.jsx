@@ -14,6 +14,52 @@ const STAGE_LABEL = {
   quarter: 'רבע הגמר', semi: 'חצי הגמר', third_place: 'מקום שלישי', final: 'הגמר הגדול',
 }
 
+// Championship scenarios — locked picks only (bracket + champion + scorer),
+// computed from the KO standings before the 3rd-place match and final.
+// Match bets (up to 16 pts) can flip scenarios marked 'צמוד'.
+const TITLE_SCENARIOS = [
+  {
+    id: 'spain-mbappe',
+    champ: 'ספרד', scorerName: 'אמבפה',
+    podium: [
+      { name: 'מוזס', pts: 190 },
+      { name: 'ברקו', pts: 172 },
+      { name: 'איתי', pts: 146 },
+    ],
+    tight: false,
+  },
+  {
+    id: 'spain-messi',
+    champ: 'ספרד', scorerName: 'מסי',
+    podium: [
+      { name: 'מוזס', pts: 165 },
+      { name: 'דוד',  pts: 153 },
+      { name: 'ברקו', pts: 147 },
+    ],
+    tight: true,
+  },
+  {
+    id: 'arg-mbappe',
+    champ: 'ארגנטינה', scorerName: 'אמבפה',
+    podium: [
+      { name: 'איתי', pts: 183 },
+      { name: 'דוד',  pts: 165 },
+      { name: 'מוזס', pts: 153 },
+    ],
+    tight: true,
+  },
+  {
+    id: 'arg-messi',
+    champ: 'ארגנטינה', scorerName: 'מסי',
+    podium: [
+      { name: 'דוד',  pts: 190 },
+      { name: 'מאיר', pts: 176 },
+      { name: 'איתי', pts: 155 },
+    ],
+    tight: true,
+  },
+]
+
 // Golden-boot race note — Mbappé (plays 3rd place) vs Messi (plays final), tied on 8
 function scorerNote(name) {
   if (!name) return null
@@ -318,6 +364,56 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, score
           </div>
         </div>
       )}
+
+      {/* Championship scenarios */}
+      <div className="relative px-3 pb-4">
+        <p className="text-center text-[10px] font-extrabold tracking-widest uppercase text-white/50 mb-0.5">
+          — 🎯 תרחישי האליפות · מי לוקח את הכל? —
+        </p>
+        <p className="text-center text-[9px] text-white/40 mb-2">
+          לפי הניחושים הנעולים · הימורי המשחקים (עד 16 נק׳) יכולים להפוך תרחיש צמוד
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {TITLE_SCENARIOS.map(sc => (
+            <div key={sc.id} className="bg-white/10 backdrop-blur-sm rounded-2xl p-2.5">
+              {/* Scenario condition */}
+              <div className="flex items-center justify-center gap-1.5 mb-2">
+                <FlagImg team={sc.champ} size="xs" />
+                <span className="text-[10px] font-black text-white">{sc.champ} אלופה</span>
+                <span className="text-white/30 text-[9px]">+</span>
+                <span className="text-[10px] font-black text-sky-200">👟 {sc.scorerName}</span>
+              </div>
+              {/* Podium */}
+              <div className="space-y-1">
+                {sc.podium.map((p, i) => (
+                  <div key={p.name} className={`flex items-center justify-between rounded-lg px-2 py-1 ${
+                    i === 0 ? 'bg-amber-400/25' : 'bg-white/5'
+                  }`}>
+                    <span className={`text-[10px] font-extrabold ${
+                      i === 0 ? 'text-amber-300' : 'text-white/70'
+                    }`}>
+                      {i === 0 ? '👑' : i === 1 ? '🥈' : '🥉'} {p.name}
+                    </span>
+                    <span className={`text-[10px] font-black tabular-nums ${
+                      i === 0 ? 'text-amber-300' : 'text-white/50'
+                    }`}>
+                      {p.pts}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {sc.tight && (
+                <p className="text-center text-[8px] font-bold text-rose-300 mt-1.5">
+                  🔥 צמוד — הימורי המשחקים יכריעו
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-[9px] text-white/40 mt-2 leading-snug">
+          ⚔️ מלך השערים: תיקו 8–8 · אמבפה יורה בשבת (3–4), מסי עונה בגמר
+        </p>
+      </div>
     </div>
   )
 }
