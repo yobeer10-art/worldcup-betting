@@ -14,6 +14,18 @@ const STAGE_LABEL = {
   quarter: 'רבע הגמר', semi: 'חצי הגמר', third_place: 'מקום שלישי', final: 'הגמר הגדול',
 }
 
+// Golden-boot race note — Mbappé (plays 3rd place) vs Messi (plays final), tied on 8
+function scorerNote(name) {
+  if (!name) return null
+  if (name.includes('מבפה') || name.toLowerCase?.().includes('mbapp')) {
+    return '⚔️ תיקו 8–8 מול מסי — יזכה אם יבקיע במשחק 3–4 יותר משמסי יבקיע בגמר'
+  }
+  if (name.includes('מסי') || name.toLowerCase?.().includes('messi')) {
+    return '⚔️ תיקו 8–8 מול אמבפה — יזכה אם יבקיע בגמר יותר משאמבפה יבקיע במשחק 3–4'
+  }
+  return 'המירוץ לנעל הזהב יוכרע במשחקי הסיום'
+}
+
 /* ── Live countdown row ──────────────────────────────────────── */
 function Countdown({ target }) {
   const [now, setNow] = useState(() => Date.now())
@@ -251,7 +263,7 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, score
               {scorer ? (
                 <>
                   <span className="text-xs font-black text-white leading-snug line-clamp-2">{scorer}</span>
-                  <p className="text-[10px] font-extrabold text-sky-300 mt-1.5">🎯 בתקווה שיכבוש בגמר!</p>
+                  <p className="text-[10px] font-extrabold text-sky-300 mt-1.5 leading-snug">{scorerNote(scorer)}</p>
                 </>
               ) : (
                 <p className="text-xs font-bold text-sky-300">עוד לא בחרת →</p>
