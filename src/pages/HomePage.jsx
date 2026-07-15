@@ -48,7 +48,9 @@ function Countdown({ target }) {
 }
 
 /* ── Unified knockout hub: hype + countdown + betting in one ─── */
-function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, scorer, user }) {
+function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, scorer, user, allPicks }) {
+  // Only unfinished matches are shown as cards (results live in the leaderboard)
+  const showMatches = bigMatches.filter(m => m.status !== 'finished')
   const nextUp  = bigMatches.find(m => m.status === 'upcoming' && new Date(m.match_date).getTime() > Date.now())
   const isFinal = bigMatches.some(m => m.stage === 'final')
   const stageLabel = isFinal ? 'הגמר הגדול' : STAGE_LABEL[bigMatches[0]?.stage] ?? 'נוקאאוט'
@@ -155,7 +157,7 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, score
 
       {/* Betting cards embedded — the Final gets a golden shimmering centerpiece */}
       <div className="relative px-3 pb-3 space-y-3">
-        {bigMatches.map(m => (
+        {showMatches.map(m => (
           m.stage === 'final' ? (
             <div key={m.id} className="relative pt-4">
               {/* Floating sparkles */}
@@ -259,6 +261,51 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, score
           </div>
         </div>
       )}
+
+      {/* Everyone's champion + scorer picks */}
+      {allPicks?.length > 0 && (
+        <div className="relative px-3 pb-4">
+          <p className="text-center text-[10px] font-extrabold tracking-widest uppercase text-white/50 mb-2">
+            — מי הימר על מי · כל השחקנים —
+          </p>
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden divide-y divide-white/10">
+            {allPicks.map(p => {
+              const alive = p.champion != null && aliveTeams.size > 0 && aliveTeams.has(p.champion)
+              return (
+                <div key={p.id} className="flex items-center gap-2 px-3 py-2">
+                  <span className="text-[11px] font-extrabold text-white w-20 truncate shrink-0">
+                    {p.name}
+                  </span>
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                    <span className="text-[10px] shrink-0">🥇</span>
+                    {p.champion ? (
+                      <>
+                        <FlagImg team={p.champion} size="xs" />
+                        <span className={`text-[10px] font-bold truncate ${
+                          alive ? 'text-amber-300' : 'text-white/40 line-through'
+                        }`}>
+                          {p.champion}
+                        </span>
+                        <span className="text-[9px] shrink-0">{alive ? '🔥' : '💔'}</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-white/30">—</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                    <span className="text-[10px] shrink-0">⚽</span>
+                    <span className={`text-[10px] font-bold truncate ${
+                      p.scorer ? 'text-sky-200' : 'text-white/30'
+                    }`}>
+                      {p.scorer ?? '—'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -292,6 +339,7 @@ export default function HomePage() {
   const [totalUsers, setTotalUsers] = useState(0)
   const [champion,   setChampion]   = useState(null)
   const [scorer,     setScorer]     = useState(null)
+  const [allPicks,   setAllPicks]   = useState([])
   const [dateStr,    setDateStr]    = useState(israelToday)
   const [isNext,     setIsNext]     = useState(false)
   const [loading,    setLoading]    = useState(true)
@@ -347,7 +395,7 @@ export default function HomePage() {
       ...(bigData ?? []).map(m => m.id),
     ])
     const ids = [...idSet]
-    const [statsRes, totalRes, betsRes, koLbRes, champRes, scorerRes] =
+    const [statsRes, totalRes, betsRes, koLbRes, champRes, scorerRes, usersRes] =
       await Promise.all([
         ids.length
           ? supabase.from('bet_stats').select('*').in('match_id', ids)
@@ -357,14 +405,9 @@ export default function HomePage() {
           ? supabase.from('bets').select('*').eq('user_id', user.id).in('match_id', ids)
           : Promise.resolve({ data: [] }),
         supabase.rpc('knockout_leaderboard'),
-        user
-          ? supabase.from('champion_predictions').select('team')
-              .eq('user_id', user.id).maybeSingle()
-          : Promise.resolve({ data: null }),
-        user
-          ? supabase.from('top_scorer_predictions').select('player_name')
-              .eq('user_id', user.id).maybeSingle()
-          : Promise.resolve({ data: null }),
+        supabase.from('champion_predictions').select('user_id, team'),
+        supabase.from('top_scorer_predictions').select('user_id, player_name'),
+        supabase.from('users').select('id, display_name'),
       ])
 
     const sm = {}
@@ -386,8 +429,20 @@ export default function HomePage() {
         setRank(idx + 1)
       }
     }
-    setChampion(champRes.data?.team ?? null)
-    setScorer(scorerRes.data?.player_name ?? null)
+    // Own picks derived from the all-users lists
+    setChampion(champRes.data?.find(c => c.user_id === user?.id)?.team ?? null)
+    setScorer(scorerRes.data?.find(s => s.user_id === user?.id)?.player_name ?? null)
+
+    // Everyone's champion + scorer picks (for the hub panel)
+    const picksList = (usersRes.data ?? [])
+      .map(u => ({
+        id:       u.id,
+        name:     u.display_name,
+        champion: champRes.data?.find(c => c.user_id === u.id)?.team ?? null,
+        scorer:   scorerRes.data?.find(s => s.user_id === u.id)?.player_name ?? null,
+      }))
+      .filter(p => p.champion || p.scorer)
+    setAllPicks(picksList)
 
     setLoading(false)
   }, [user, profile?.total_points])
@@ -465,6 +520,7 @@ export default function HomePage() {
             champion={champion}
             scorer={scorer}
             user={user}
+            allPicks={allPicks}
           />
         )}
 
