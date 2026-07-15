@@ -169,3 +169,50 @@ body {
   background-size: 200% auto;
   animation: gold-shimmer 2.5s linear infinite;
 }
+
+/* ── Final hype splash (popup "video" intro) ───────────── */
+@keyframes splash-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes splash-zoom-in {
+  0%   { opacity: 0; transform: scale(2.4); letter-spacing: 0.4em; }
+  60%  { opacity: 1; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); letter-spacing: 0.1em; }
+}
+@keyframes splash-slide-right {
+  from { opacity: 0; transform: translateX(-90px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes splash-slide-left {
+  from { opacity: 0; transform: translateX(90px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes splash-vs-flash {
+  0%   { opacity: 0; transform: scale(3) rotate(-12deg); filter: blur(6px); }
+  55%  { opacity: 1; transform: scale(1.15) rotate(2deg); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@keyframes splash-rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes splash-shine {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.splash-stage    { animation: splash-fade-in 0.5s ease both; }
+.splash-title    { animation: splash-zoom-in 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both; animation-delay: 0.3s; }
+.splash-home     { animation: splash-slide-right 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) both; animation-delay: 1.2s; }
+.splash-away     { animation: splash-slide-left  0.7s cubic-bezier(0.2, 0.8, 0.3, 1) both; animation-delay: 1.2s; }
+.splash-vs       { animation: splash-vs-flash 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) both; animation-delay: 1.9s; }
+.splash-meta     { animation: splash-rise 0.6s ease both; animation-delay: 2.5s; }
+.splash-cta      { animation: splash-rise 0.6s ease both; animation-delay: 3s; }
+.splash-gold-text {
+  background: linear-gradient(110deg, #fbbf24 25%, #fef9c3 50%, #fbbf24 75%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: splash-shine 2.5s linear infinite;
+}

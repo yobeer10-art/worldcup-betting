@@ -7,6 +7,7 @@ import MatchCard from '../components/Matches/MatchCard'
 import CompactMatchCard from '../components/Matches/CompactMatchCard'
 import FlagImg from '../components/UI/FlagImg'
 import Spinner from '../components/UI/Spinner'
+import FinalHypeSplash from '../components/UI/FinalHypeSplash'
 
 const KO_STAGES = new Set(['round_of_32','round_of_16','quarter','semi','third_place','final'])
 
@@ -567,8 +568,11 @@ export default function HomePage() {
   const otherMatches = matches.filter(m => !['semi', 'third_place', 'final'].includes(m.stage))
 
   /* ── Render ──────────────────────────────────────────────────── */
+  const finalMatch = bigMatches.find(m => m.stage === 'final' && m.status === 'upcoming')
+
   return (
     <>
+      {!loading && finalMatch && <FinalHypeSplash match={finalMatch} />}
       <Header />
       <main className="max-w-lg mx-auto px-4 py-5 pb-24 space-y-6">
 
