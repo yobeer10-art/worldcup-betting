@@ -153,17 +153,45 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, score
         )}
       </div>
 
-      {/* Betting cards embedded */}
+      {/* Betting cards embedded — the Final gets a golden shimmering centerpiece */}
       <div className="relative px-3 pb-3 space-y-3">
         {bigMatches.map(m => (
-          <CompactMatchCard
-            key={m.id}
-            match={m}
-            userBet={userBets[m.id] ?? null}
-            communityStats={stats[m.id] ?? null}
-            onBetPlaced={onBetPlaced}
-            isToday
-          />
+          m.stage === 'final' ? (
+            <div key={m.id} className="relative pt-4">
+              {/* Floating sparkles */}
+              <span className="final-sparkle" style={{ top: '2px',  right: '8%',  animationDelay: '0s'   }}>✨</span>
+              <span className="final-sparkle" style={{ top: '14px', left:  '6%',  animationDelay: '0.7s' }}>⭐</span>
+              <span className="final-sparkle" style={{ bottom: '10px', right: '4%', animationDelay: '1.2s' }}>✨</span>
+              <span className="final-sparkle" style={{ bottom: '30px', left: '3%',  animationDelay: '0.4s' }}>💫</span>
+
+              {/* Golden ribbon header */}
+              <div className="final-ribbon rounded-t-2xl mx-4 -mb-1 relative z-0 px-3 pt-1.5 pb-3 text-center">
+                <span className="text-[11px] font-black text-amber-900 tracking-widest uppercase">
+                  🏆 הגמר הגדול · מי לוקחת את הגביע? 🏆
+                </span>
+              </div>
+
+              {/* Shimmering gold frame around the betting card */}
+              <div className="final-frame relative z-[1]">
+                <CompactMatchCard
+                  match={m}
+                  userBet={userBets[m.id] ?? null}
+                  communityStats={stats[m.id] ?? null}
+                  onBetPlaced={onBetPlaced}
+                  isToday
+                />
+              </div>
+            </div>
+          ) : (
+            <CompactMatchCard
+              key={m.id}
+              match={m}
+              userBet={userBets[m.id] ?? null}
+              communityStats={stats[m.id] ?? null}
+              onBetPlaced={onBetPlaced}
+              isToday
+            />
+          )
         ))}
       </div>
 
