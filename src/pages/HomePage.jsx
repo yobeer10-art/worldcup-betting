@@ -323,37 +323,43 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, score
       {/* Everyone's champion + scorer picks */}
       {allPicks?.length > 0 && (
         <div className="relative px-3 pb-4">
-          <p className="text-center text-[10px] font-extrabold tracking-widest uppercase text-white/50 mb-2">
-            — מי הימר על מי · כל השחקנים —
+          <h3 className="text-center text-base font-black text-white mb-1">
+            👥 מי הימר על מי?
+          </h3>
+          <p className="text-center text-xs text-white/70 font-semibold mb-3">
+            האלופה ומלך השערים של כל שחקן · 25 נק׳ כל פגיעה
           </p>
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl overflow-hidden divide-y divide-white/10">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-lg divide-y divide-slate-100">
+            <div className="flex items-center gap-2 px-4 py-2 bg-slate-50">
+              <span className="text-xs font-black text-slate-400 w-20 shrink-0">שחקן</span>
+              <span className="text-xs font-black text-slate-400 flex-1">🥇 אלופה</span>
+              <span className="text-xs font-black text-slate-400 flex-1">⚽ מלך שערים</span>
+            </div>
             {allPicks.map(p => {
               const alive = p.champion != null && aliveTeams.size > 0 && aliveTeams.has(p.champion)
               return (
-                <div key={p.id} className="flex items-center gap-2 px-3 py-2">
-                  <span className="text-[11px] font-extrabold text-white w-20 truncate shrink-0">
+                <div key={p.id} className="flex items-center gap-2 px-4 py-2.5">
+                  <span className="text-sm font-black text-slate-800 w-20 truncate shrink-0">
                     {p.name}
                   </span>
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <span className="text-[10px] shrink-0">🥇</span>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
                     {p.champion ? (
                       <>
                         <FlagImg team={p.champion} size="xs" />
-                        <span className={`text-[10px] font-bold truncate ${
-                          alive ? 'text-amber-300' : 'text-white/40 line-through'
+                        <span className={`text-sm font-bold truncate ${
+                          alive ? 'text-amber-600' : 'text-slate-300 line-through'
                         }`}>
                           {p.champion}
                         </span>
-                        <span className="text-[9px] shrink-0">{alive ? '🔥' : '💔'}</span>
+                        <span className="text-xs shrink-0">{alive ? '🔥' : '💔'}</span>
                       </>
                     ) : (
-                      <span className="text-[10px] text-white/30">—</span>
+                      <span className="text-sm text-slate-300">—</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1 flex-1 min-w-0">
-                    <span className="text-[10px] shrink-0">⚽</span>
-                    <span className={`text-[10px] font-bold truncate ${
-                      p.scorer ? 'text-sky-200' : 'text-white/30'
+                    <span className={`text-sm font-bold truncate ${
+                      p.scorer ? 'text-sky-600' : 'text-slate-300'
                     }`}>
                       {p.scorer ?? '—'}
                     </span>
@@ -367,52 +373,71 @@ function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, score
 
       {/* Championship scenarios */}
       <div className="relative px-3 pb-4">
-        <p className="text-center text-[10px] font-extrabold tracking-widest uppercase text-white/50 mb-0.5">
-          — 🎯 תרחישי האליפות · מי לוקח את הכל? —
+        <h3 className="text-center text-base font-black text-white mb-1">
+          🎯 תרחישי האליפות
+        </h3>
+        <p className="text-center text-xs text-white/70 font-semibold mb-3">
+          מי מסיים ראשון? תלוי במי שתיקח את הגביע ובמלך השערים
         </p>
-        <p className="text-center text-[9px] text-white/40 mb-2">
-          לפי הניחושים הנעולים · הימורי המשחקים (עד 16 נק׳) יכולים להפוך תרחיש צמוד
-        </p>
-        <div className="grid grid-cols-2 gap-2">
+
+        <div className="space-y-3">
           {TITLE_SCENARIOS.map(sc => (
-            <div key={sc.id} className="bg-white/10 backdrop-blur-sm rounded-2xl p-2.5">
-              {/* Scenario condition */}
-              <div className="flex items-center justify-center gap-1.5 mb-2">
-                <FlagImg team={sc.champ} size="xs" />
-                <span className="text-[10px] font-black text-white">{sc.champ} אלופה</span>
-                <span className="text-white/30 text-[9px]">+</span>
-                <span className="text-[10px] font-black text-sky-200">👟 {sc.scorerName}</span>
+            <div key={sc.id} className="bg-white rounded-2xl overflow-hidden shadow-lg">
+              {/* Scenario condition header */}
+              <div className={`px-4 py-2.5 flex items-center justify-center gap-2 ${
+                sc.champ === 'ספרד'
+                  ? 'bg-gradient-to-l from-red-600 to-yellow-500'
+                  : 'bg-gradient-to-l from-sky-500 to-blue-600'
+              }`}>
+                <FlagImg team={sc.champ} size="sm" />
+                <span className="text-sm font-black text-white drop-shadow">
+                  {sc.champ} אלופה
+                </span>
+                <span className="text-white/70 font-black">+</span>
+                <span className="text-sm font-black text-white drop-shadow">
+                  👟 {sc.scorerName} מלך שערים
+                </span>
               </div>
+
               {/* Podium */}
-              <div className="space-y-1">
+              <div className="p-3 space-y-1.5">
                 {sc.podium.map((p, i) => (
-                  <div key={p.name} className={`flex items-center justify-between rounded-lg px-2 py-1 ${
-                    i === 0 ? 'bg-amber-400/25' : 'bg-white/5'
+                  <div key={p.name} className={`flex items-center justify-between rounded-xl px-3 py-2 ${
+                    i === 0
+                      ? 'bg-gradient-to-l from-amber-100 to-yellow-50 border-2 border-amber-300'
+                      : 'bg-slate-50 border border-slate-100'
                   }`}>
-                    <span className={`text-[10px] font-extrabold ${
-                      i === 0 ? 'text-amber-300' : 'text-white/70'
+                    <span className={`font-black ${
+                      i === 0 ? 'text-base text-amber-700' : 'text-sm text-slate-600'
                     }`}>
                       {i === 0 ? '👑' : i === 1 ? '🥈' : '🥉'} {p.name}
+                      {i === 0 && <span className="text-xs font-extrabold text-amber-500 mr-1.5">אלוף!</span>}
                     </span>
-                    <span className={`text-[10px] font-black tabular-nums ${
-                      i === 0 ? 'text-amber-300' : 'text-white/50'
+                    <span className={`font-black tabular-nums ${
+                      i === 0 ? 'text-lg text-amber-600' : 'text-sm text-slate-400'
                     }`}>
-                      {p.pts}
+                      {p.pts} <span className="text-[10px] font-bold">נק׳</span>
                     </span>
                   </div>
                 ))}
+
+                {sc.tight && (
+                  <p className="text-center text-xs font-extrabold text-rose-500 pt-1">
+                    🔥 מרוץ צמוד! הימורי שני המשחקים האחרונים יכריעו
+                  </p>
+                )}
               </div>
-              {sc.tight && (
-                <p className="text-center text-[8px] font-bold text-rose-300 mt-1.5">
-                  🔥 צמוד — הימורי המשחקים יכריעו
-                </p>
-              )}
             </div>
           ))}
         </div>
-        <p className="text-center text-[9px] text-white/40 mt-2 leading-snug">
-          ⚔️ מלך השערים: תיקו 8–8 · אמבפה יורה בשבת (3–4), מסי עונה בגמר
-        </p>
+
+        <div className="mt-3 bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5">
+          <p className="text-center text-xs text-white font-bold leading-relaxed">
+            ⚔️ מרוץ מלך השערים: <span className="text-amber-300">תיקו 8–8</span>
+            <br />
+            אמבפה יורה בשבת (משחק 3–4) · מסי עונה בגמר ביום ראשון
+          </p>
+        </div>
       </div>
     </div>
   )
