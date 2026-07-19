@@ -123,6 +123,9 @@ function ChampionsFinale({ standings }) {
             🏁 מונדיאל 2026 · הטורניר הסתיים
           </p>
           <h2 className="text-2xl font-black leading-tight mt-1">התוצאות הסופיות</h2>
+          <p className="text-[11px] text-white/70 font-semibold mt-1">
+            לפי טבלת הנוקאאוט — הימורים + ברקט + אלופה ומלך שערים
+          </p>
         </div>
 
         {/* Tournament winners strip */}
@@ -662,7 +665,12 @@ export default function HomePage() {
       }))
       .filter(p => p.champion || p.scorer)
     setAllPicks(picksList)
-    setStandings(usersRes.data ?? [])
+    // Final standings = the knockout table (KO bets + bracket + awards) — the deciding table
+    setStandings((koLbRes.data ?? []).map(r => ({
+      id: r.user_id,
+      display_name: r.display_name,
+      total_points: Number(r.knockout_points ?? 0),
+    })))
 
     setLoading(false)
   }, [user, profile?.total_points])
