@@ -106,6 +106,111 @@ function Countdown({ target }) {
   )
 }
 
+/* ── Tournament finale: festive final standings ───────────────── */
+function ChampionsFinale({ standings }) {
+  const [first, second, third, ...rest] = standings
+
+  return (
+    <div className="relative overflow-hidden rounded-3xl shadow-xl bg-gradient-to-b from-amber-500 via-orange-500 to-rose-600">
+      {/* Ambient glows */}
+      <div className="absolute -top-12 -left-12 w-48 h-48 bg-yellow-300/25 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-14 -right-10 w-44 h-44 bg-white/15 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative p-4 pb-4 text-white">
+        {/* Header */}
+        <div className="text-center mb-4">
+          <p className="text-[11px] font-extrabold tracking-[0.3em] uppercase text-white/70">
+            🏁 מונדיאל 2026 · הטורניר הסתיים
+          </p>
+          <h2 className="text-2xl font-black leading-tight mt-1">התוצאות הסופיות</h2>
+        </div>
+
+        {/* Tournament winners strip */}
+        <div className="flex justify-center gap-2 mb-5 text-center">
+          <div className="bg-white/15 backdrop-blur-sm rounded-xl px-3 py-2 flex-1">
+            <p className="text-[10px] text-white/60 font-bold mb-1">אלופת העולם</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <FlagImg team="ספרד" size="xs" />
+              <span className="text-sm font-black">ספרד</span>
+            </div>
+          </div>
+          <div className="bg-white/15 backdrop-blur-sm rounded-xl px-3 py-2 flex-1">
+            <p className="text-[10px] text-white/60 font-bold mb-1">מלך השערים</p>
+            <span className="text-sm font-black">👟 אמבפה</span>
+          </div>
+          <div className="bg-white/15 backdrop-blur-sm rounded-xl px-3 py-2 flex-1">
+            <p className="text-[10px] text-white/60 font-bold mb-1">מקום שלישי</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <FlagImg team="אנגליה" size="xs" />
+              <span className="text-sm font-black">אנגליה</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Champion of the league */}
+        {first && (
+          <div className="final-frame mb-3">
+            <div className="bg-white rounded-2xl px-4 py-4 text-center relative overflow-hidden">
+              <span className="final-sparkle" style={{ top: '8px', right: '10%', animationDelay: '0s'   }}>✨</span>
+              <span className="final-sparkle" style={{ top: '14px', left: '8%',  animationDelay: '0.8s' }}>⭐</span>
+              <p className="text-4xl mb-1">👑</p>
+              <p className="text-[11px] font-extrabold text-amber-500 tracking-widest uppercase mb-0.5">
+                אלוף מהמרי בראשית 2026
+              </p>
+              <h3 className="text-3xl font-black text-slate-800">{first.display_name}</h3>
+              <p className="text-lg font-black text-amber-600 tabular-nums mt-0.5">
+                {first.total_points} נקודות
+              </p>
+              {second && first.total_points - second.total_points === 1 && (
+                <p className="text-[11px] font-bold text-rose-500 mt-1">
+                  🔥 הוכרע בנקודה אחת בלבד!
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 2nd + 3rd */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {second && (
+            <div className="bg-white/95 rounded-2xl px-3 py-3 text-center">
+              <p className="text-xl">🥈</p>
+              <p className="text-sm font-black text-slate-700 truncate">{second.display_name}</p>
+              <p className="text-[13px] font-bold text-slate-400 tabular-nums">{second.total_points} נק׳</p>
+            </div>
+          )}
+          {third && (
+            <div className="bg-white/95 rounded-2xl px-3 py-3 text-center">
+              <p className="text-xl">🥉</p>
+              <p className="text-sm font-black text-slate-700 truncate">{third.display_name}</p>
+              <p className="text-[13px] font-bold text-slate-400 tabular-nums">{third.total_points} נק׳</p>
+            </div>
+          )}
+        </div>
+
+        {/* Rest of the table */}
+        {rest.length > 0 && (
+          <div className="bg-white/95 rounded-2xl overflow-hidden divide-y divide-slate-50">
+            {rest.map((p, i) => (
+              <div key={p.id} className="flex items-center justify-between px-4 py-2">
+                <span className="text-[13px] font-bold text-slate-600">
+                  <span className="inline-block w-6 text-slate-300 font-semibold">{i + 4}</span>
+                  {p.display_name}
+                </span>
+                <span className="text-[13px] font-semibold text-slate-400 tabular-nums">{p.total_points} נק׳</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="text-center text-xs text-white/80 font-bold mt-4">
+          תודה שהימרתם איתנו — נתראה במונדיאל 2030! ⚽❤️
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /* ── Unified knockout hub: hype + countdown + betting in one ─── */
 function KnockoutHub({ bigMatches, userBets, stats, onBetPlaced, champion, scorer, user, allPicks }) {
   // Only unfinished matches are shown as cards (results live in the leaderboard)
@@ -453,6 +558,7 @@ export default function HomePage() {
   const [champion,   setChampion]   = useState(null)
   const [scorer,     setScorer]     = useState(null)
   const [allPicks,   setAllPicks]   = useState([])
+  const [standings,  setStandings]  = useState([])
   const [dateStr,    setDateStr]    = useState(israelToday)
   const [isNext,     setIsNext]     = useState(false)
   const [loading,    setLoading]    = useState(true)
@@ -520,7 +626,7 @@ export default function HomePage() {
         supabase.rpc('knockout_leaderboard'),
         supabase.from('champion_predictions').select('user_id, team'),
         supabase.from('top_scorer_predictions').select('user_id, player_name'),
-        supabase.from('users').select('id, display_name'),
+        supabase.from('users').select('id, display_name, total_points').order('total_points', { ascending: false }),
       ])
 
     const sm = {}
@@ -556,6 +662,7 @@ export default function HomePage() {
       }))
       .filter(p => p.champion || p.scorer)
     setAllPicks(picksList)
+    setStandings(usersRes.data ?? [])
 
     setLoading(false)
   }, [user, profile?.total_points])
@@ -569,6 +676,7 @@ export default function HomePage() {
 
   /* ── Render ──────────────────────────────────────────────────── */
   const finalMatch = bigMatches.find(m => m.stage === 'final' && m.status === 'upcoming')
+  const tournamentOver = bigMatches.some(m => m.stage === 'final' && m.status === 'finished')
 
   return (
     <>
@@ -626,8 +734,11 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* ── Tournament over: festive final standings ─────────── */}
+        {!loading && tournamentOver && <ChampionsFinale standings={standings} />}
+
         {/* ── Unified knockout hub (SF / Final: hype + betting) ── */}
-        {!loading && bigMatches.length > 0 && (
+        {!loading && !tournamentOver && bigMatches.length > 0 && (
           <KnockoutHub
             bigMatches={bigMatches}
             userBets={userBets}
