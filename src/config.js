@@ -18,8 +18,8 @@ export const WHATSAPP_NUMBER = '972508118515'
 
 // 4️⃣ פרטי העסק
 export const SITE = {
-  name:     'רכבי 7 מקומות',
-  tagline:  'הקטלוג המוביל לרכבי 7 מקומות בישראל',
+  name:     '7 בום',
+  tagline:  'מוכרים רכבי 7 מקומות',
   phone:    '050-8118515',
   email:    '',
 }

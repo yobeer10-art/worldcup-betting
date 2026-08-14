@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { CARS_CSV_URL } from '../config'
+import { normalizeMake } from './makes'
 
 /* ── מיפוי כותרות: תומך גם באנגלית וגם בעברית ──────────────── */
 const HEADER_ALIASES = {
@@ -35,10 +36,24 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : null
 }
 
-/* ── תמונות: תומך בפסיקים/שורות, וממיר קישורי Google Drive ── */
-function driveDirectUrl(url) {
-  const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([\w-]+)/)
-  if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1600`
+/* ── תמונות: תומך בפסיקים/שורות, וממיר קישורי שיתוף נפוצים ── */
+function toDirectImageUrl(raw) {
+  let url = raw.trim().replace(/^["']|["']$/g, '')
+
+  // Google Drive — כל הפורמטים הנפוצים של קישורי שיתוף
+  const drive =
+       url.match(/drive\.google\.com\/file\/d\/([\w-]{20,})/)
+    ?? url.match(/drive\.google\.com\/(?:open|uc|thumbnail)\?[^#]*[?&]?id=([\w-]{20,})/)
+    ?? url.match(/drive\.usercontent\.google\.com\/download\?id=([\w-]{20,})/)
+    ?? url.match(/docs\.google\.com\/uc\?[^#]*id=([\w-]{20,})/)
+  if (drive) return `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w1600`
+
+  // Google Photos / קישור מקוצר — לא ניתן להמרה, יוצג כפלייסהולדר
+  // Dropbox — הפיכה לקישור ישיר
+  if (/dropbox\.com/i.test(url)) {
+    return url.replace(/[?&]dl=\d/, '').replace(/[?&]raw=\d/, '') + '?raw=1'
+  }
+
   return url
 }
 
@@ -48,7 +63,7 @@ function parseImages(value) {
     .split(/[,\n|]+/)
     .map(s => s.trim())
     .filter(s => /^https?:\/\//i.test(s))
-    .map(driveDirectUrl)
+    .map(toDirectImageUrl)
 }
 
 /* ── המרת שורת CSV לאובייקט רכב ────────────────────────────── */
@@ -58,7 +73,7 @@ function rowToCar(row, index) {
     car[normalizeHeader(rawKey)] = typeof rawVal === 'string' ? rawVal.trim() : rawVal
   }
 
-  const make  = car.make  || ''
+  const make  = normalizeMake(car.make)
   const model = car.model || ''
   if (!make && !model) return null                       // שורה ריקה
 

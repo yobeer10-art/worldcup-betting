@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { saveLead, whatsappUrl, isValidPhone } from '../../lib/leads'
 import { fmtPrice } from '../../lib/cars'
+import CarImage from '../UI/CarImage'
 
 export default function LeadModal({ car, onClose }) {
   const [name,    setName]    = useState('')
@@ -44,21 +45,20 @@ export default function LeadModal({ car, onClose }) {
         {/* ידית גרירה במובייל */}
         <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4 sm:hidden" />
 
-        <h3 className="text-lg font-black text-slate-900 text-center">מעוניינים בפרטים?</h3>
+        <h3 className="text-lg font-black text-slate-900 text-center">רוצים את הרכב הזה?</h3>
         <p className="text-[13px] text-slate-400 text-center mt-1 mb-4">
-          נשמח לחזור אליכם עם כל המידע
+          השאירו פרטים ונחזור אליכם עם כל המידע והצעת מחיר
         </p>
 
         {/* הרכב שנבחר */}
         {car && (
           <div className="flex items-center gap-3 bg-slate-50 rounded-2xl p-3 mb-4">
-            {car.images[0] && (
-              <img
-                src={car.images[0]}
-                alt={car.title}
-                className="w-16 h-14 object-cover rounded-xl shrink-0"
-              />
-            )}
+            <CarImage
+              src={car.images[0]}
+              alt={car.title}
+              iconSize="text-xl"
+              className="w-16 h-14 object-cover rounded-xl shrink-0"
+            />
             <div className="min-w-0">
               <p className="text-sm font-extrabold text-slate-800 truncate">{car.title}</p>
               <p className="text-[12px] text-slate-400">

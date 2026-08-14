@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { fmtPrice, fmtKm, fmtHand } from '../../lib/cars'
+import CarImage from '../UI/CarImage'
 
 export default function CarCard({ car }) {
   const cover = car.images[0]
@@ -12,16 +13,11 @@ export default function CarCard({ car }) {
     >
       {/* תמונה */}
       <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
-        {cover ? (
-          <img
-            src={cover}
-            alt={car.title}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">🚐</div>
-        )}
+        <CarImage
+          src={cover}
+          alt={car.title}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
 
         {car.year && (
           <span className="absolute top-2.5 right-2.5 bg-slate-900/75 backdrop-blur-sm text-white
@@ -52,7 +48,7 @@ export default function CarCard({ car }) {
             {fmtPrice(car.price)}
           </span>
           <span className="text-[12px] font-bold text-slate-400 group-hover:text-blue-600 transition-colors">
-            לפרטים ←
+            אני מעוניין ←
           </span>
         </div>
       </div>

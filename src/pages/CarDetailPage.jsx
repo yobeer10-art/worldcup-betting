@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { fetchCars, fmtPrice, fmtKm, fmtHand } from '../lib/cars'
 import Header from '../components/Layout/Header'
 import Spinner from '../components/UI/Spinner'
+import CarImage from '../components/UI/CarImage'
 import LeadModal from '../components/Cars/LeadModal'
 
 function Spec({ label, value }) {
@@ -64,11 +65,12 @@ export default function CarDetailPage() {
         {/* גלריה */}
         <div className="mt-3 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
           <div className="aspect-[4/3] sm:aspect-[16/10]">
-            {car.images[active] ? (
-              <img src={car.images[active]} alt={car.title} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-6xl opacity-20">🚐</div>
-            )}
+            <CarImage
+              src={car.images[active]}
+              alt={car.title}
+              iconSize="text-6xl"
+              className="w-full h-full object-cover"
+            />
           </div>
         </div>
 
@@ -82,7 +84,7 @@ export default function CarDetailPage() {
                   i === active ? 'border-blue-500 ring-2 ring-blue-100' : 'border-transparent opacity-60'
                 }`}
               >
-                <img src={src} alt="" className="w-full h-full object-cover" />
+                <CarImage src={src} iconSize="text-lg" className="w-full h-full object-cover" />
               </button>
             ))}
           </div>
@@ -135,7 +137,7 @@ export default function CarDetailPage() {
             className="shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white font-black
                        px-6 py-3 rounded-2xl transition-colors active:scale-95 flex items-center gap-2"
           >
-            <span>💬</span> לפרטים נוספים
+            <span>💬</span> אני רוצה את הרכב
           </button>
         </div>
       </div>

@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png', 'icon-512-maskable.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'רכבי 7 מקומות',
-        short_name: 'רכבי 7 מקומות',
-        description: 'קטלוג רכבי 7 מקומות למשפחה',
+        name: '7 בום — מוכרים רכבי 7 מקומות',
+        short_name: '7 בום',
+        description: 'מתמחים במכירת רכבי 7 מקומות — רכבים בדוקים, מחיר ללא תיווך וליווי אישי',
         lang: 'he',
         dir: 'rtl',
         theme_color: '#1e3a8a',
